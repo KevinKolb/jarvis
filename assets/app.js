@@ -172,9 +172,9 @@ function renderNP() {
   const np = document.getElementById("np-line");
   if (!np) return;
   const vp = sonosVol + "%";
-  if (npPlaying && npTrack) np.textContent = "Now playing " + npTrack + " · " + vp;
-  else if (npPlaying) np.textContent = "Now playing · " + vp;
-  else np.textContent = "Nothing playing · " + vp;
+  if (npPlaying && npTrack) np.textContent = npTrack + " · " + vp;
+  else if (npPlaying) np.textContent = vp;
+  else np.textContent = "Paused · " + vp;
 }
 function setSonosVolume(level) {
   fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -342,16 +342,19 @@ function nearestSwatch(state) {
 }
 // Hero reflects the ACTUAL current light (on/off + color), not the staged pick.
 function paintHero(on, state) {
-  const hero = document.getElementById("kitchen-hero");
-  if (!hero) return;
+  // Colors the kitchen hero AND the Kitchen button on the home page identically.
+  const els = [document.getElementById("kitchen-hero"), document.getElementById("room-kitchen")].filter(Boolean);
+  if (!els.length) return;
+  let bg, fg;
   if (on && state) {
     const sw = nearestSwatch(state);
-    hero.style.background = sw.css;
-    hero.style.color = textColorFor(sw.css);
+    bg = sw.css;
+    fg = textColorFor(sw.css);
   } else {
-    hero.style.background = "#000000";      // lights off -> black hero
-    hero.style.color = "#b8b8b8";           // light gray text
+    bg = "#000000";      // lights off -> black
+    fg = "#b8b8b8";      // light gray text
   }
+  els.forEach((el) => { el.style.background = bg; el.style.color = fg; });
 }
 
 function updateLightsStatus() {

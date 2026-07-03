@@ -193,6 +193,16 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.08em;
   color: inherit;
 }
+.hero-np {
+  margin-top: 0.7rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: inherit;
+  line-height: 1.35;
+}
 .conn-bar {
   margin: 0 0.35rem 0.6rem;
   font-family: "Space Mono", monospace;
