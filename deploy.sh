@@ -21,6 +21,7 @@ scp -q -r \
   "$DIR/assets" \
   "$DIR/server.py" \
   "$DIR/favicon.ico" \
+  "$DIR/kitchen.ico" \
   "$DIR/setup-pi.sh" \
   "$PI:~/jarvis/"
 

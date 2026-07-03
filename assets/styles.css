@@ -197,12 +197,21 @@ button { font: inherit; color: inherit; }
 #conn-text[data-conn="online"] { color: var(--ink); }
 #conn-text[data-conn="offline"] { color: var(--muted); }
 .kitchen-title {
+  display: flex;
+  align-items: center;
+  gap: 0.22em;
   margin: 0.5rem 0 0;
   font-weight: 700;
   font-size: clamp(2.6rem, 13vw, 3.6rem);
   line-height: 0.9;
   letter-spacing: -0.02em;
   text-transform: uppercase;
+}
+.kitchen-title-ico {
+  flex: none;
+  width: 0.82em;
+  height: 0.82em;
+  color: var(--ink);
 }
 .hero-lights {
   display: flex;
