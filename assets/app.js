@@ -152,6 +152,7 @@ const MUSIC = {
     { label: "Southern Nights", fav: "Southern Nights" },
     { label: "Vivid", fav: "Vivid" },
     { label: "Simple", fav: "Simple" },
+    { label: "Foot of Canal St", fav: "Foot of Canal Street" },
   ],
   albums: [
     { label: "Juicy Playlist", fav: "A Juicy Playlist" },
