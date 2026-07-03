@@ -140,11 +140,11 @@ const COLORS = [
 const MUSIC = {
   radio: [
     { label: "John Mayer", fav: "CH 14 - Life with John Mayer" },
+    { label: "WWOZ", fav: "WWOZ" },
     { label: "Yacht Rock", fav: "CH 17 - Yacht Rock Radio" },
     { label: "The Bridge", fav: "CH 27 - The Bridge" },
     { label: "Chill", fav: "CH 55 - SiriusXM Chill" },
     { label: "Classic Vinyl", fav: "CH 26 - Classic Vinyl" },
-    { label: "WWOZ", fav: "WWOZ" },
   ],
   jukebox: [
     { label: "Juicy Playlist", fav: "A Juicy Playlist" },
