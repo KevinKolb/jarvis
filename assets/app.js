@@ -46,14 +46,35 @@ const CONFIG = {
        "Kitchen Lights Off": { url: "https://your-ha/api/webhook/kitchen_lights_off" },
 
      Hue local API example (only if this page is served over http):
-       "Kitchen Lights On":  { url: "http://<bridge-ip>/api/<user>/groups/1/action",
+       "Kitchen Lights On":  { url: "http://<bridge-ip>/api/<user>/groups/82/action",
                                method: "PUT", body: '{"on":true}' },
   --------------------------------------------------------------------- */
   control: {
-    mode: "shortcut",          // "shortcut" | "fetch"
+    // Leave as "shortcut" until the URLs below are filled in with real
+    // values, then change to "fetch" for silent, no-app-switch control.
+    // Only light actions are listed here — music runs through Alexa (no
+    // local API), so those keep using Shortcuts automatically.
+    mode: "fetch",             // "shortcut" | "fetch"
+
     endpoints: {
-      // "Kitchen Lights On":  { url: "", method: "POST", body: "" },
-      // "Kitchen Lights Off": { url: "", method: "POST", body: "" },
+      /* ===== OPTION A — Philips Hue bridge (direct) · CONFIGURED =====
+         Kitchen = group 82. On/Off toggle the group; Cooking = bright
+         cool white (bri 254, ct 250), Dinner = dim warm (bri 76, ct 450).
+         Works only when this page is opened over http on SpamNet — a
+         plain-http bridge is blocked from the https github.io site. */
+      "Kitchen Lights On":     { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":true}' },
+      "Kitchen Lights Off":    { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":false}' },
+      "Kitchen-Scene-Cooking": { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":true,"bri":254,"ct":250}' },
+      "Kitchen-Scene-Dinner":  { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":true,"bri":76,"ct":450}' },
+
+      /* ===== OPTION B — Home Assistant webhooks (https) =============
+         Delete OPTION A above and uncomment these. Works on the live
+         https github.io site. In HA: Settings > Automations > New >
+         Trigger: Webhook, then use the same webhook id in the URL. */
+      // "Kitchen Lights On":     { url: "https://<YOUR-HA>/api/webhook/kitchen_lights_on" },
+      // "Kitchen Lights Off":    { url: "https://<YOUR-HA>/api/webhook/kitchen_lights_off" },
+      // "Kitchen-Scene-Cooking": { url: "https://<YOUR-HA>/api/webhook/kitchen_scene_cooking" },
+      // "Kitchen-Scene-Dinner":  { url: "https://<YOUR-HA>/api/webhook/kitchen_scene_dinner" },
     },
   },
 };
