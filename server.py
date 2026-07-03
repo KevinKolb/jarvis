@@ -20,8 +20,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 BRIDGE_IP = "192.168.86.151"
 HUE_USER  = "qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a"
 PORT      = 80
-# ---- Kitchen Sonos (stereo pair; this is the coordinator) ---------------
-SONOS_IP  = "192.168.86.150"
+# ---- Kitchen Sonos (stereo pair; .41 = the pair's coordinator) ----------
+SONOS_IP  = "192.168.86.41"
 # ------------------------------------------------------------------------
 
 
@@ -69,9 +69,9 @@ class Handler(SimpleHTTPRequestHandler):
         # Read Sonos volume:  GET /sonos/volume
         if self.path == "/sonos/volume":
             try:
-                xml = self._sonos("RenderingControl", "GetVolume",
-                    '<u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1">'
-                    '<InstanceID>0</InstanceID><Channel>Master</Channel></u:GetVolume>')
+                xml = self._sonos("GroupRenderingControl", "GetGroupVolume",
+                    '<u:GetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
+                    '<InstanceID>0</InstanceID></u:GetGroupVolume>')
                 m = re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", xml)
                 self._json({"volume": int(m.group(1)) if m else 0})
             except Exception as exc:
@@ -95,18 +95,29 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length) if length else b"{}"
+
+        # Set Sonos group volume:  POST /sonos/volume  {"level": 0-100}
+        if self.path == "/sonos/volume":
+            try:
+                level = max(0, min(100, int(json.loads(raw or b"{}").get("level", 0))))
+                self._sonos("GroupRenderingControl", "SetGroupVolume",
+                    '<u:SetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
+                    '<InstanceID>0</InstanceID><DesiredVolume>%d</DesiredVolume></u:SetGroupVolume>' % level)
+                self._json({"ok": True, "volume": level})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
         if self.path.rstrip("/") != "/hue":
             self.send_error(404)
             return
-
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            payload = json.loads(raw or b"{}")
             path = payload.get("path", "")            # e.g. /groups/82/action
             body = json.dumps(payload.get("body", {})).encode()
-
             result = self._bridge("PUT", path, body)
-
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()

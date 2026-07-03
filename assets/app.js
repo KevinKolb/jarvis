@@ -132,17 +132,55 @@ const COLORS = [
   { name: "Yellow", css: "#fdd835", body: { on: true, hue: 10500, sat: 254 } },
   { name: "Green",  css: "#43a047", body: { on: true, hue: 25500, sat: 254 } },
   { name: "Blue",   css: "#1e88e5", body: { on: true, hue: 43690, sat: 254 } },
-  { name: "Violet", css: "#8e24aa", body: { on: true, hue: 54000, sat: 254 } },
+  { name: "Purple", css: "#8e24aa", body: { on: true, hue: 54000, sat: 254 } },
 ];
 
-// Kitchen Sonos volume, shown in the hero after the lights blurb.
-function updateNowPlaying() {
-  const el = document.getElementById("np-line");
-  if (!el) return;
+// Kitchen Sonos volume (stereo pair group volume, via the Pi).
+function showVol(v) {
+  const out = document.getElementById("vol-val");
+  const np = document.getElementById("np-line");
+  if (out) out.textContent = v + "%";
+  if (np) np.textContent = "Now playing " + v + "%";
+}
+function setSonosVolume(level) {
+  fetch("/sonos/volume", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ level: level }),
+    keepalive: true,
+  }).catch(() => {});
+}
+function updateSonos() {
   fetch("/sonos/volume", { cache: "no-store" })
     .then((r) => r.json())
-    .then((d) => { el.textContent = "Now playing " + (d.volume != null ? d.volume : "—") + "%"; })
-    .catch(() => { el.textContent = "Now playing —"; });
+    .then((d) => {
+      if (!d || typeof d.volume !== "number") return;
+      showVol(d.volume);
+      const s = document.getElementById("volume");
+      if (s && d.volume >= 1 && d.volume <= 99) s.value = d.volume;
+    })
+    .catch(() => {
+      const np = document.getElementById("np-line");
+      if (np) np.textContent = "Now playing —";
+    });
+}
+function bindVolume() {
+  const s = document.getElementById("volume");
+  const v0 = document.getElementById("vol-0");
+  const v100 = document.getElementById("vol-100");
+  let t;
+  if (s) s.addEventListener("input", () => {
+    const v = Number(s.value);              // 1..99
+    showVol(v);
+    clearTimeout(t);                        // throttle while dragging
+    t = window.setTimeout(() => setSonosVolume(v), 120);
+  });
+  if (v0) v0.addEventListener("click", () => { showVol(0); setSonosVolume(0); });
+  if (v100) v100.addEventListener("click", () => {
+    if (s) s.value = 99;
+    showVol(100);
+    setSonosVolume(100);
+  });
 }
 
 // Real "Kitchen · online/offline" indicator, based on bridge reachability.
@@ -578,6 +616,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindLightsToggle();
   bindLightTools();
   resetLightControls();     // default selection: white + 100%
+  bindVolume();
   updateLightsStatus();
-  updateNowPlaying();
+  updateSonos();
 });

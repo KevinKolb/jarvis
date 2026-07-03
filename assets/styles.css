@@ -405,6 +405,10 @@ button { font: inherit; color: inherit; }
 .bri-end:active { transform: translate(1px, 1px); box-shadow: none; }
 .bri-off { background: #000000; color: #b8b8b8; }
 
+/* volume slider: black -> music blue; 100% button blue */
+#volume { --track-color: var(--music); }
+.vol-max { background: var(--music); color: #ffffff; }
+
 /* color swatches */
 .swatches {
   display: grid;
@@ -714,9 +718,9 @@ button { font: inherit; color: inherit; }
 }
 .qr-frame {
   flex: none;
-  width: 56px;
-  height: 56px;
-  padding: 5px;
+  width: 112px;
+  height: 112px;
+  padding: 10px;
   border-radius: 0;
   background: #ffffff;
   border: 3px solid var(--edge);
@@ -731,6 +735,14 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.08em;
   color: var(--muted);
   margin-bottom: 5px;
+}
+.qr-wifi {
+  margin-top: 6px;
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 .qr-url {
   display: inline-block;
@@ -797,10 +809,10 @@ button { font: inherit; color: inherit; }
     margin: 0 0 0.45in;
   }
   .print-qr {
-    width: 4in;
-    height: 4in;
+    width: 2in;
+    height: 2in;
     color: #000;
-    padding: 0.2in;
+    padding: 0.12in;
     background: #fff;
     border: 3pt solid #000;
   }
