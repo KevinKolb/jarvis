@@ -155,10 +155,12 @@ button { font: inherit; color: inherit; }
   width: 8px; height: 8px;
   margin-right: 6px;
   border-radius: 0;
-  background: #12b76a;
+  background: var(--muted);
   border: 1.5px solid var(--edge);
   vertical-align: middle;
 }
+.status-dot[data-conn="online"] { background: #12b76a; }
+.status-dot[data-conn="offline"] { background: var(--danger); }
 
 .greeting {
   font-weight: 700;
@@ -174,6 +176,31 @@ button { font: inherit; color: inherit; }
   color: var(--ink);
   font-size: 0.95rem;
   line-height: 1.45;
+}
+
+/* ---------- Kitchen header (replaces the hero box) ---------- */
+.kitchen-head {
+  padding: 1.3rem 1.4rem 1.5rem;
+  margin-bottom: 1.3rem;
+}
+.kitchen-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.kitchen-title {
+  margin: 0.5rem 0 0;
+  font-weight: 700;
+  font-size: clamp(2.6rem, 13vw, 3.6rem);
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 
 /* ---------- Sections ---------- */
@@ -199,7 +226,8 @@ button { font: inherit; color: inherit; }
 
 /* ---------- Lights status line ---------- */
 .lights-status {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
   gap: 0.5rem;
   margin: -0.2rem 0 0.8rem;
@@ -337,8 +365,8 @@ button { font: inherit; color: inherit; }
 /* color swatches */
 .swatches {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.5rem;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.4rem;
 }
 .swatch {
   -webkit-appearance: none;
