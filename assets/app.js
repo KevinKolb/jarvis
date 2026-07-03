@@ -122,16 +122,16 @@ function runHue(body) {
   runHueProxy({ path: "/groups/" + LIGHTS_GROUP + "/action", body: body });
 }
 
-// White + ROYGBIV. `css` is the swatch color; `body` is sent to the bridge.
-// (White uses color temperature; the rest use Hue's 0–65535 hue wheel.)
+// Black (= off) + White + ROYGBV. `css` is the swatch color; `body` is sent
+// to the bridge. White uses color temperature; colors use Hue's hue wheel.
 const COLORS = [
+  { name: "Black",  css: "#000000", off: true },
   { name: "White",  css: "#ffffff", body: { on: true, sat: 0, ct: 250 } },
   { name: "Red",    css: "#e53935", body: { on: true, hue: 0,     sat: 254 } },
   { name: "Orange", css: "#fb8c00", body: { on: true, hue: 4500,  sat: 254 } },
   { name: "Yellow", css: "#fdd835", body: { on: true, hue: 10500, sat: 254 } },
   { name: "Green",  css: "#43a047", body: { on: true, hue: 25500, sat: 254 } },
   { name: "Blue",   css: "#1e88e5", body: { on: true, hue: 43690, sat: 254 } },
-  { name: "Indigo", css: "#3949ab", body: { on: true, hue: 47000, sat: 254 } },
   { name: "Violet", css: "#8e24aa", body: { on: true, hue: 54000, sat: 254 } },
 ];
 
@@ -213,12 +213,38 @@ function setTrackColor(css) {
   const slider = document.getElementById("brightness");
   if (slider) slider.style.setProperty("--track-color", css);
 }
-function paintHero(on) {
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return [200, 200, 200];
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+// Map the actual bulb color to the nearest swatch (so red reads as our red).
+function nearestSwatch(state) {
+  if (!state || state.colormode === "ct" || state.sat == null || state.sat < 20) {
+    return COLORS.find((c) => c.name === "White");
+  }
+  const rgb = (state.colormode === "xy" && Array.isArray(state.xy))
+    ? xyToRgb(state.xy[0], state.xy[1])
+    : hslToRgb((state.hue || 0) / 65535, (state.sat || 0) / 254, 0.5);
+  const h = rgbToHue(rgb);
+  let best = null, bestD = Infinity;
+  COLORS.forEach((c) => {
+    if (c.off || c.name === "White") return;
+    let d = Math.abs(h - rgbToHue(hexToRgb(c.css)));
+    if (d > 180) d = 360 - d;
+    if (d < bestD) { bestD = d; best = c; }
+  });
+  return best || COLORS.find((c) => c.name === "White");
+}
+// Hero reflects the ACTUAL current light (on/off + color), not the staged pick.
+function paintHero(on, state) {
   const hero = document.getElementById("kitchen-hero");
   if (!hero) return;
-  if (on && pendingColor) {
-    hero.style.background = pendingColor.css;   // exact selected color, pure
-    hero.style.color = textColorFor(pendingColor.css);
+  if (on && state) {
+    const sw = nearestSwatch(state);
+    hero.style.background = sw.css;
+    hero.style.color = textColorFor(sw.css);
   } else {
     hero.style.background = "";
     hero.style.color = "";
@@ -246,7 +272,7 @@ function updateLightsStatus() {
       } else if (text) {
         text.textContent = "Lights off";
       }
-      paintHero(on);
+      paintHero(on, lstate);
       updateToggle();
     })
     .catch(() => {
@@ -254,7 +280,7 @@ function updateLightsStatus() {
       lightsOn = null;
       const text = document.getElementById("lights-line-text");
       if (text) text.textContent = "Lights —";
-      paintHero(false);
+      paintHero(false, null);
       updateToggle();
     });
 }
@@ -271,7 +297,7 @@ function textColorFor(css) {
 
 // When the lights go off, reset the controls to defaults: white + 100%.
 function resetLightControls() {
-  const white = COLORS[0];                          // white is the first swatch
+  const white = COLORS.find((c) => c.name === "White");
   pendingColor = { body: white.body, css: white.css, name: white.name };
   pendingBri = 254;                                 // 100%
   dirty = false;
@@ -279,7 +305,7 @@ function resetLightControls() {
   const out = document.getElementById("bri-val");
   if (slider) slider.value = 100;
   if (out) out.textContent = "100%";
-  selectSwatch(document.querySelector("#swatches .swatch"));
+  selectSwatch(document.querySelector('#swatches .swatch[data-name="White"]'));
   setTrackColor(white.css);
   updateToggle();
 }
@@ -291,11 +317,15 @@ function updateToggle() {
   const txt = btn.querySelector(".toggle-txt");
   const pct = pendingBri != null ? Math.round((pendingBri / 254) * 100) : 100;
   const name = pendingColor ? pendingColor.name : "";
-  if (txt) txt.textContent = pct + "% " + name + " Engage";
+  const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
+  if (txt) txt.textContent = isOff ? "Lights off" : pct + "% " + name + " Engage";
   btn.style.background = "";
   btn.style.color = "";
   btn.dataset.state = lightsOn === true ? "on" : lightsOn === false ? "off" : "unknown";
-  if (pendingColor) {                         // show the selected color
+  if (isOff) {                                // black or 0% -> off preview
+    btn.style.background = "#000000";
+    btn.style.color = "#ffffff";
+  } else if (pendingColor) {                  // show the selected color
     btn.style.background = pendingColor.css;
     btn.style.color = textColorFor(pendingColor.css);
   }
@@ -305,16 +335,17 @@ function bindLightsToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
   btn.addEventListener("click", () => {
-    if (pendingBri === 0 || (lightsOn && !dirty)) {
-      // 0% brightness, or on with nothing newly selected -> turn off
+    const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
+    if (isOff || (lightsOn && !dirty)) {
+      // black or 0% selected, or on with nothing newly selected -> turn off
       runAction("Kitchen Lights Off");
       resetLightControls();
       lightsOn = false;
       toast("The kitchen lights are off.");
     } else {
       // enact the current selection (turn on / update in place); keep selection
-      const body = pendingColor ? Object.assign({}, pendingColor.body) : { on: true };
-      if (pendingBri != null) body.bri = pendingBri;
+      const body = pendingColor && pendingColor.body ? Object.assign({}, pendingColor.body) : { on: true };
+      if (pendingBri != null && pendingBri > 0) body.bri = pendingBri;
       runHue(body);
       dirty = false;
       lightsOn = true;
@@ -336,10 +367,11 @@ function bindLightTools() {
       b.style.background = c.css;
       b.title = c.name;
       b.setAttribute("aria-label", c.name);
+      b.dataset.name = c.name;
       b.addEventListener("click", () => {
         selectSwatch(b);
         setTrackColor(c.css);              // brightness bar takes the color
-        pendingColor = { body: c.body, css: c.css, name: c.name };   // always stage
+        pendingColor = { body: c.body, css: c.css, name: c.name, off: c.off };   // always stage
         dirty = true;
         updateToggle();
         toast(c.name + " staged — press Engage.");
