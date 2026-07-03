@@ -164,17 +164,27 @@ class Handler(SimpleHTTPRequestHandler):
                 state = first(r"<CurrentTransportState>(\w+)</CurrentTransportState>", tx)
                 playing = state == "PLAYING"
 
+                mi = self._sonos("AVTransport", "GetMediaInfo",
+                    '<u:GetMediaInfo xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:GetMediaInfo>')
+                src = html.unescape(first(r"<CurrentURIMetaData>(.*?)</CurrentURIMetaData>", mi))
+                station = html.unescape(first(r"<dc:title[^>]*>(.*?)</dc:title>", src)).strip()
+
                 didl = html.unescape(first(r"<TrackMetaData>(.*?)</TrackMetaData>", px))
                 def tag(t):
                     return html.unescape(first(r"<%s[^>]*>(.*?)</%s>" % (t, t), didl)).strip()
+                def junk(s):
+                    s = (s or "").lower()
+                    return (not s) or any(x in s for x in ("http", ".mp3", "aw_0", "playerid", "listeningsession", "?", "="))
                 stream = tag("r:streamContent")
                 title, creator = tag("dc:title"), tag("dc:creator")
-                if stream:
+                if not junk(stream):
                     track = stream
-                elif creator and title:
-                    track = creator + " — " + title
+                elif title and not junk(title):
+                    track = (creator + " — " + title) if creator and not junk(creator) else title
                 else:
-                    track = title
+                    track = station
+                if not track:
+                    track = station
                 self._json({"volume": vol, "mute": mute, "playing": playing, "track": track})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
