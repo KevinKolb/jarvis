@@ -305,8 +305,8 @@ function bindLightsToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
   btn.addEventListener("click", () => {
-    if (lightsOn && !dirty) {
-      // on, nothing newly selected -> turn off (resets selection to white/100)
+    if (pendingBri === 0 || (lightsOn && !dirty)) {
+      // 0% brightness, or on with nothing newly selected -> turn off
       runAction("Kitchen Lights Off");
       resetLightControls();
       lightsOn = false;
@@ -354,7 +354,7 @@ function bindLightTools() {
     slider.addEventListener("input", () => {
       const pct = Number(slider.value);
       if (out) out.textContent = pct + "%";
-      pendingBri = Math.max(1, Math.round((pct / 100) * 254));   // always stage
+      pendingBri = Math.round((pct / 100) * 254);   // 0 -> off on engage; always stage
       dirty = true;
       updateToggle();
     });

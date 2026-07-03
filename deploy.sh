@@ -22,6 +22,8 @@ scp -q -r \
   "$DIR/server.py" \
   "$DIR/favicon.ico" \
   "$DIR/kitchen.ico" \
+  "$DIR/home-touch.png" \
+  "$DIR/kitchen-touch.png" \
   "$DIR/setup-pi.sh" \
   "$PI:~/jarvis/"
 
