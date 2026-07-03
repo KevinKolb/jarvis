@@ -168,7 +168,7 @@ function updateLightsStatus() {
       // Keep the brightness slider in sync with the real value.
       const slider = document.getElementById("brightness");
       const briOut = document.getElementById("bri-val");
-      if (typeof bri === "number" && slider) {
+      if (on && typeof bri === "number" && slider) {   // only sync while on
         const pct = Math.round((bri / 254) * 100);
         slider.value = pct;
         if (briOut) briOut.textContent = pct + "%";
@@ -181,7 +181,7 @@ function updateLightsStatus() {
         if (square) square.style.background = hueColor(g.action);
       } else {
         if (text) text.textContent = "Lights off";
-        if (square) square.style.background = pendingColor ? pendingColor.css : "#363636";
+        if (square) square.style.background = "#363636";
       }
       updateToggle();
     })
@@ -204,6 +204,20 @@ function textColorFor(css) {
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return lum > 0.6 ? "#141410" : "#ffffff";
+}
+
+// When the lights go off, reset the controls to defaults: white + 100%.
+function resetLightControls() {
+  const white = COLORS[0];                          // white is the first swatch
+  pendingColor = { body: white.body, css: white.css };
+  pendingBri = 254;                                 // 100%
+  const slider = document.getElementById("brightness");
+  const out = document.getElementById("bri-val");
+  if (slider) slider.value = 100;
+  if (out) out.textContent = "100%";
+  selectSwatch(document.querySelector("#swatches .swatch"));
+  const square = document.getElementById("lights-square");
+  if (square) square.style.background = "#363636";   // off -> gray square
 }
 
 /* ---------- On/Off toggle: label + action follow current state ---------- */
@@ -248,9 +262,7 @@ function bindLightsToggle() {
       toast("The kitchen lights are on.");
     } else {
       runAction("Kitchen Lights Off");
-      pendingColor = null;
-      pendingBri = null;
-      selectSwatch(null);
+      resetLightControls();
       toast("The kitchen lights are off.");
     }
     lightsOn = turningOn;                                // optimistic
@@ -272,7 +284,6 @@ function bindLightTools() {
       b.setAttribute("aria-label", c.name);
       b.addEventListener("click", () => {
         selectSwatch(b);
-        const square = document.getElementById("lights-square");
         if (lightsOn) {
           // Lights on: apply the color now.
           runHue(c.body);
@@ -280,9 +291,9 @@ function bindLightTools() {
           toast("Kitchen lights set to " + c.name.toLowerCase() + ".");
           window.setTimeout(updateLightsStatus, 500);
         } else {
-          // Lights off: just stage the color for the next turn-on.
+          // Lights off: stage for next turn-on (shown on the toggle button +
+          // selected swatch; the hero square stays gray to mean "off").
           pendingColor = { body: c.body, css: c.css };
-          if (square) square.style.background = c.css;
           updateToggle();
           toast(c.name + " ready — applies when the lights turn on.");
         }
