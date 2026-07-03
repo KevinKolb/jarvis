@@ -246,8 +246,8 @@ function paintHero(on, state) {
     hero.style.background = sw.css;
     hero.style.color = textColorFor(sw.css);
   } else {
-    hero.style.background = "";
-    hero.style.color = "";
+    hero.style.background = "#000000";      // lights off -> black hero
+    hero.style.color = "#b8b8b8";           // light gray text
   }
 }
 
