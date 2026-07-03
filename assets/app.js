@@ -240,11 +240,11 @@ function bindVolume() {
 
 // Real "Kitchen · online/offline" indicator, based on bridge reachability.
 function setConn(online) {
+  const state = online ? "online" : "offline";
   const txt = document.getElementById("conn-text");
-  if (txt) {
-    txt.textContent = online ? "online" : "offline";
-    txt.dataset.conn = online ? "online" : "offline";
-  }
+  const dot = document.getElementById("conn-dot");
+  if (txt) { txt.textContent = state; txt.dataset.conn = state; }
+  if (dot) dot.dataset.conn = state;
 }
 
 // Current light color as [r,g,b] (used to paint the hero background).

@@ -453,13 +453,46 @@ button { font: inherit; color: inherit; }
 .chan-btn:hover { transform: translate(-2px, -2px); box-shadow: var(--sh); }
 .chan-btn:active { transform: translate(2px, 2px); box-shadow: none; background: var(--music); color: #fff; }
 
-/* ---------- Footer (Rooms) ---------- */
+/* ---------- Footer (Rooms + connection status) ---------- */
 .page-footer {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
   margin-top: 1.6rem;
+  padding: 1.4rem 0 2.2rem;
 }
 .page-footer .backlink { margin: 0; }
+.conn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.conn-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+.conn-dot[data-conn="online"] {
+  background: #12b76a;
+  animation: conn-pulse 1.5s ease-in-out infinite;
+}
+.conn-dot[data-conn="offline"] {
+  background: var(--danger);
+  animation: none;
+}
+@keyframes conn-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(18, 183, 106, 0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(18, 183, 106, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(18, 183, 106, 0); }
+}
 
 /* ---------- Lists (SiriusXM / Podcasts) ---------- */
 .list {
