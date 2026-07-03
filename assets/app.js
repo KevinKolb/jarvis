@@ -266,10 +266,18 @@ function renderShare() {
     .catch(() => {});
 }
 function renderMusic() {
-  [["row-radio", MUSIC.radio], ["row-artists", MUSIC.artists], ["row-jukebox", MUSIC.jukebox], ["row-albums", MUSIC.albums], ["row-playlists", MUSIC.playlists], ["row-podcasts", MUSIC.podcasts]]
+  fetch("/music", { cache: "no-store" })
+    .then((r) => r.json())
+    .then((M) => renderMusicRows(M || MUSIC))
+    .catch(() => renderMusicRows(MUSIC));
+}
+function renderMusicRows(M) {
+  [["row-radio", M.radio], ["row-artists", M.artists], ["row-jukebox", M.jukebox],
+   ["row-albums", M.albums], ["row-playlists", M.playlists], ["row-podcasts", M.podcasts]]
     .forEach(([id, list]) => {
       const host = document.getElementById(id);
-      if (!host) return;
+      if (!host || !list) return;
+      host.innerHTML = "";
       list.forEach((c) => {
         const b = document.createElement("button");
         b.type = "button";

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f1e6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14140f" media="(prefers-color-scheme: dark)">
+  <title>Admin · JARVIS</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <style>
+    .admin-form { display: flex; flex-direction: column; gap: 0.9rem; }
+    .admin-form label { display: flex; flex-direction: column; gap: 0.35rem;
+      font-family: "Space Mono", monospace; font-size: 0.72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .admin-form input[type=text], .admin-form select {
+      -webkit-appearance: none; appearance: none; font: inherit; font-size: 1rem;
+      padding: 0.7rem 0.8rem; border: 3px solid var(--edge); border-radius: 0;
+      background: var(--surface); color: var(--ink); }
+    .admin-detect { font-family: "Space Mono", monospace; font-size: 0.78rem;
+      font-weight: 700; color: var(--music); min-height: 1.1rem; }
+    .admin-check { flex-direction: row !important; align-items: center; gap: 0.5rem !important;
+      color: var(--ink) !important; text-transform: none !important; letter-spacing: 0 !important;
+      font-size: 0.9rem !important; }
+    .admin-check input { width: 22px; height: 22px; }
+    .admin-sec { padding: 1rem 1.1rem; margin-top: 1rem; }
+    .admin-sec-title { font-family: "Space Mono", monospace; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em; color: var(--on-accent, #fff);
+      background: var(--music); border: 2px solid var(--edge); display: inline-block;
+      padding: 2px 8px; margin-bottom: 0.7rem; font-size: 0.72rem; }
+    .admin-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0;
+      border-top: 2px solid var(--line); }
+    .admin-item:first-of-type { border-top: 0; }
+    .admin-item span { flex: 1; font-size: 0.9rem; word-break: break-word; }
+    .admin-rm { flex: none; width: 34px; height: 34px; border: 3px solid var(--edge);
+      background: var(--surface); font-weight: 700; font-size: 1.1rem; cursor: pointer; line-height: 1; }
+    .admin-rm:active { background: var(--danger); color: #fff; }
+    .admin-add { width: 100%; min-height: 58px; justify-content: center; font-size: 1.05rem; }
+    .admin-title { text-align: center; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4em; text-indent: 0.4em; margin: 0 0 1.3rem; color: var(--ink); }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <p class="admin-title">Jarvis Admin</p>
+
+    <section class="card" style="padding:1.4rem">
+      <div class="admin-form">
+        <label>Apple Music URL — or a Sonos favorite name
+          <input id="a-url" type="text" autocomplete="off"
+            placeholder="https://music.apple.com/... or e.g. WWOZ">
+        </label>
+        <div id="a-detect" class="admin-detect"></div>
+        <label>Section
+          <select id="a-section">
+            <option value="radio">Radio</option>
+            <option value="artists">Artists</option>
+            <option value="jukebox">Jukebox</option>
+            <option value="albums">Albums</option>
+            <option value="playlists">Playlists</option>
+            <option value="podcasts">Podcasts</option>
+          </select>
+        </label>
+        <label>Button label
+          <input id="a-label" type="text" autocomplete="off" placeholder="Short name on the button">
+        </label>
+        <label class="admin-check"><input id="a-shuffle" type="checkbox"> Shuffle when played</label>
+        <button id="a-add" class="btn admin-add" type="button">Add button</button>
+      </div>
+    </section>
+
+    <section id="a-list"></section>
+
+    <footer class="page-footer">
+      <a class="backlink" href="/kitchen/">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        Kitchen
+      </a>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const SECTIONS = ["radio", "artists", "jukebox", "albums", "playlists", "podcasts"];
+    let toastT;
+    function toast(msg) {
+      const el = $("toast"); if (!el) return;
+      el.textContent = msg; el.classList.add("show");
+      clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 2600);
+    }
+    function parseApple(u) {
+      u = (u || "").trim(); let m;
+      if (m = u.match(/music\.apple\.com\/library\/playlist\/(p\.[\w-]+|pl\.[\w-]+)/i)) return { kind: "libraryplaylist", id: m[1] };
+      if (m = u.match(/music\.apple\.com\/[^/]+\/playlist\/[^/]+\/(pl\.[\w-]+)/i)) return { kind: "playlist", id: m[1] };
+      if (m = u.match(/[?&]i=(\d+)/)) return { kind: "song", id: m[1] };
+      if (m = u.match(/music\.apple\.com\/[^/]+\/song\/[^/]+\/(\d+)/i)) return { kind: "song", id: m[1] };
+      if (m = u.match(/music\.apple\.com\/[^/]+\/album\/[^/]+\/(\d+)/i)) return { kind: "album", id: m[1] };
+      if (m = u.match(/music\.apple\.com\/[^/]+\/artist\/[^/]+\/(\d+)/i)) return { kind: "artist", id: m[1] };
+      return null;
+    }
+    function titleFromUrl(u) {
+      const m = (u || "").match(/music\.apple\.com\/[^/]+\/(?:album|song|playlist|artist)\/([^/?]+)/i);
+      if (!m) return "";
+      try { return decodeURIComponent(m[1]).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
+      catch (e) { return ""; }
+    }
+    $("a-url").addEventListener("input", () => {
+      const u = $("a-url").value; const a = parseApple(u); const det = $("a-detect");
+      if (a) {
+        det.textContent = "Detected: " + a.kind + " · " + a.id + (a.kind === "artist" ? "  ⚠ artists can't play — use a playlist" : "");
+        const t = titleFromUrl(u); if (!$("a-label").value) $("a-label").value = t;
+        if (a.kind === "album") $("a-section").value = "albums";
+        else if (a.kind === "song") $("a-section").value = "jukebox";
+        else if (a.kind === "libraryplaylist" || a.kind === "playlist") { $("a-section").value = "playlists"; $("a-shuffle").checked = true; }
+      } else if (u.trim()) {
+        det.textContent = "Treated as a Sonos favorite name";
+      } else det.textContent = "";
+    });
+    $("a-add").addEventListener("click", () => {
+      const u = $("a-url").value.trim();
+      const section = $("a-section").value;
+      const label = $("a-label").value.trim() || titleFromUrl(u) || u;
+      if (!u) { toast("Enter a URL or favorite name."); return; }
+      const a = parseApple(u);
+      let item;
+      if (a) {
+        if (a.kind === "artist") { toast("Artists can't play through Sonos — paste a playlist URL instead."); return; }
+        item = { label: label, apple: { kind: a.kind, id: a.id, title: titleFromUrl(u) || label } };
+      } else {
+        item = { label: label, fav: u };
+      }
+      if ($("a-shuffle").checked) item.shuffle = true;
+      fetch("/music/add", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section: section, item: item }) })
+        .then((r) => r.json())
+        .then(() => {
+          toast("Added \"" + label + "\" to " + section + ".");
+          $("a-url").value = ""; $("a-label").value = ""; $("a-shuffle").checked = false; $("a-detect").textContent = "";
+          loadList();
+        })
+        .catch(() => toast("Couldn't add — is the Pi reachable?"));
+    });
+    function loadList() {
+      fetch("/music", { cache: "no-store" }).then((r) => r.json()).then((cfg) => {
+        const host = $("a-list"); host.innerHTML = "";
+        SECTIONS.forEach((sec) => {
+          const items = cfg[sec] || [];
+          const card = document.createElement("div"); card.className = "card admin-sec";
+          const h = document.createElement("div"); h.className = "admin-sec-title"; h.textContent = sec; card.appendChild(h);
+          if (!items.length) {
+            const e = document.createElement("div"); e.className = "admin-item"; e.style.color = "var(--muted)";
+            e.textContent = "— empty —"; card.appendChild(e);
+          }
+          items.forEach((it, idx) => {
+            const row = document.createElement("div"); row.className = "admin-item";
+            const nm = document.createElement("span");
+            nm.textContent = it.label + "  ·  " + (it.apple ? (it.apple.kind + " " + it.apple.id) : ("fav: " + it.fav)) + (it.shuffle ? "  ·  shuffle" : "");
+            const rm = document.createElement("button"); rm.className = "admin-rm"; rm.textContent = "×"; rm.title = "Remove";
+            rm.addEventListener("click", () => {
+              fetch("/music/remove", { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ section: sec, index: idx }) }).then(() => { toast("Removed."); loadList(); });
+            });
+            row.appendChild(nm); row.appendChild(rm); card.appendChild(row);
+          });
+          host.appendChild(card);
+        });
+      });
+    }
+    loadList();
+  </script>
+</body>
+</html>

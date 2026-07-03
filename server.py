@@ -36,6 +36,53 @@ SONOS_ROOMS = [                            # other rooms you can share kitchen a
 ]
 # ------------------------------------------------------------------------
 
+# Music buttons live in music.json (editable via /admin). Seeded from this
+# default the first time the server runs.
+MUSIC_FILE = "music.json"
+DEFAULT_MUSIC = {
+    "radio": [
+        {"label": "John Mayer", "fav": "CH 14 - Life with John Mayer"},
+        {"label": "WWOZ", "fav": "WWOZ"},
+        {"label": "Yacht Rock", "fav": "CH 17 - Yacht Rock Radio"},
+        {"label": "The Bridge", "fav": "CH 27 - The Bridge"},
+        {"label": "Chill", "fav": "CH 55 - SiriusXM Chill"},
+        {"label": "Classic Vinyl", "fav": "CH 26 - Classic Vinyl"},
+        {"label": "Beatles", "fav": "CH 18 - The Beatles Channel"},
+    ],
+    "artists": [],
+    "jukebox": [
+        {"label": "Foot of Canal St", "fav": "Foot of Canal Street"},
+        {"label": "Sledgehammer", "apple": {"kind": "song", "id": "987872731", "title": "Sledgehammer"}},
+    ],
+    "albums": [
+        {"label": "Rubber Soul", "apple": {"kind": "album", "id": "1441164359", "title": "Rubber Soul"}},
+        {"label": "Southern Nights", "fav": "Southern Nights"},
+        {"label": "Vivid", "fav": "Vivid"},
+    ],
+    "playlists": [
+        {"label": "Morning Alarm", "shuffle": True, "apple": {"kind": "libraryplaylist", "id": "p.b16GR55TARxgG", "title": "Morning Alarm"}},
+        {"label": "Juicy Playlist", "shuffle": True, "fav": "A Juicy Playlist"},
+        {"label": "Happy Rock", "shuffle": True, "fav": "Happy Rock"},
+        {"label": "Simple", "shuffle": True, "fav": "Simple"},
+    ],
+    "podcasts": [
+        {"label": "Learn French", "fav": "Learn French"},
+    ],
+}
+
+def load_music():
+    try:
+        with open(MUSIC_FILE) as f:
+            return json.load(f)
+    except Exception:
+        save_music(DEFAULT_MUSIC)
+        return dict(DEFAULT_MUSIC)
+
+def save_music(cfg):
+    with open(MUSIC_FILE, "w") as f:
+        json.dump(cfg, f, indent=2)
+# ------------------------------------------------------------------------
+
 
 class Handler(SimpleHTTPRequestHandler):
     # Serve files quietly; only note errors.
@@ -301,6 +348,11 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
+
+        # Music buttons config (for the kitchen page + admin)
+        if self.path == "/music":
+            self._json(load_music())
+            return
         # Read light state:  GET /hue/groups/82  ->  bridge /groups/82
         if self.path.startswith("/hue/"):
             try:
@@ -397,6 +449,32 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 p = json.loads(raw or b"{}")
                 self._play_apple(p.get("kind", "song"), str(p.get("id", "")), p.get("title", ""), bool(p.get("shuffle")))
+                self._json({"ok": True})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Admin: add a music button:  POST /music/add  {"section","item"}
+        if self.path == "/music/add":
+            try:
+                p = json.loads(raw or b"{}")
+                cfg = load_music()
+                cfg.setdefault(p.get("section"), []).append(p.get("item"))
+                save_music(cfg)
+                self._json({"ok": True})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Admin: remove a music button:  POST /music/remove  {"section","index"}
+        if self.path == "/music/remove":
+            try:
+                p = json.loads(raw or b"{}")
+                section, idx = p.get("section"), int(p.get("index", -1))
+                cfg = load_music()
+                if section in cfg and 0 <= idx < len(cfg[section]):
+                    cfg[section].pop(idx)
+                    save_music(cfg)
                 self._json({"ok": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)

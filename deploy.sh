@@ -17,6 +17,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "Copying files to $PI ..."
 scp -q -r \
   "$DIR/index.html" \
+  "$DIR/admin.html" \
   "$DIR/kitchen" \
   "$DIR/assets" \
   "$DIR/server.py" \
