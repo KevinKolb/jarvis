@@ -27,54 +27,30 @@ const CONFIG = {
 
   /* ---- How controls fire ----------------------------------------------
      mode "shortcut": tap opens the Shortcuts app and runs the named
-                      Shortcut (works for anything, but flashes the app).
-     mode "fetch":    tap fires a silent background request — NO app
-                      switch. Any action listed in `endpoints` below uses
-                      fetch; anything not listed falls back to a Shortcut.
+                      Shortcut. Music uses this (Alexa has no local API).
+     mode "fetch":    tap fires a silent request — NO app switch. Actions
+                      listed in `endpoints` use it; anything else falls
+                      back to a Shortcut.
 
-     Key each endpoint by the SAME name used in data-shortcut / the
-     `shortcut` field above. Then flip mode to "fetch".
-
-     NOTE on hosting: this page is served over https (github.io). Browsers
-     block https pages from calling plain-http LAN devices (mixed content),
-     so a bare Hue bridge at http://192.168… will be blocked here. Use an
-     https endpoint — e.g. a Home Assistant webhook (Nabu Casa / reverse
-     proxy) — or host this page over http on your LAN for Hue.
-
-     Home Assistant webhook example (https, no auth, fire-and-forget):
-       "Kitchen Lights On":  { url: "https://your-ha/api/webhook/kitchen_lights_on" },
-       "Kitchen Lights Off": { url: "https://your-ha/api/webhook/kitchen_lights_off" },
-
-     Hue local API example (only if this page is served over http):
-       "Kitchen Lights On":  { url: "http://<bridge-ip>/api/<user>/groups/82/action",
-                               method: "PUT", body: '{"on":true}' },
+     Hue lights go through the Pi's built-in relay (server.py) at POST
+     /hue — the browser never contacts the bridge directly (browsers block
+     the PUT/CORS request a Hue bridge needs). The bridge IP + token live
+     in server.py on the Pi, NOT in this public file.
   --------------------------------------------------------------------- */
   control: {
-    // Leave as "shortcut" until the URLs below are filled in with real
-    // values, then change to "fetch" for silent, no-app-switch control.
-    // Only light actions are listed here — music runs through Alexa (no
-    // local API), so those keep using Shortcuts automatically.
     mode: "fetch",             // "shortcut" | "fetch"
 
     endpoints: {
-      /* ===== OPTION A — Philips Hue bridge (direct) · CONFIGURED =====
-         Kitchen = group 82. On/Off toggle the group; Cooking = bright
-         cool white (bri 254, ct 250), Dinner = dim warm (bri 76, ct 450).
-         Works only when this page is opened over http on SpamNet — a
-         plain-http bridge is blocked from the https github.io site. */
-      "Kitchen Lights On":     { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":true}' },
-      "Kitchen Lights Off":    { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":false}' },
-      "Kitchen-Scene-Cooking": { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":true,"bri":254,"ct":250}' },
-      "Kitchen-Scene-Dinner":  { url: "http://192.168.86.151/api/qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a/groups/82/action", method: "PUT", body: '{"on":true,"bri":76,"ct":450}' },
+      // Kitchen = Hue group 82. On/Off toggle it; Cooking = bright cool
+      // white, Dinner = dim warm. `path` + `body` are forwarded to the
+      // bridge by the Pi relay. Tweak brightness/color here.
+      "Kitchen Lights On":     { hue: { path: "/groups/82/action", body: { on: true } } },
+      "Kitchen Lights Off":    { hue: { path: "/groups/82/action", body: { on: false } } },
+      "Kitchen-Scene-Cooking": { hue: { path: "/groups/82/action", body: { on: true, bri: 254, ct: 250 } } },
+      "Kitchen-Scene-Dinner":  { hue: { path: "/groups/82/action", body: { on: true, bri: 76, ct: 450 } } },
 
-      /* ===== OPTION B — Home Assistant webhooks (https) =============
-         Delete OPTION A above and uncomment these. Works on the live
-         https github.io site. In HA: Settings > Automations > New >
-         Trigger: Webhook, then use the same webhook id in the URL. */
-      // "Kitchen Lights On":     { url: "https://<YOUR-HA>/api/webhook/kitchen_lights_on" },
-      // "Kitchen Lights Off":    { url: "https://<YOUR-HA>/api/webhook/kitchen_lights_off" },
-      // "Kitchen-Scene-Cooking": { url: "https://<YOUR-HA>/api/webhook/kitchen_scene_cooking" },
-      // "Kitchen-Scene-Dinner":  { url: "https://<YOUR-HA>/api/webhook/kitchen_scene_dinner" },
+      // Non-Hue example (Home Assistant webhook, direct https):
+      //   "Kitchen Lights On": { url: "https://<YOUR-HA>/api/webhook/kitchen_lights_on" },
     },
   },
 };
@@ -118,6 +94,16 @@ function runFetch(req) {
   }).catch(() => { /* ignore — request still leaves the device */ });
 }
 
+/* ---------- Ask the Pi relay to talk to the Hue bridge ---------- */
+function runHueProxy(hue) {
+  fetch("/hue", {                       // same-origin: the Pi, not the bridge
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(hue),
+    keepalive: true,
+  }).catch(() => { /* relay unreachable — Pi off, or not on SpamNet */ });
+}
+
 /* ---------- Decide how an action runs ---------- */
 function runAction(name, el) {
   // Element-level override wins: data-fetch / data-method / data-body
@@ -126,9 +112,9 @@ function runAction(name, el) {
     return;
   }
   const ep = CONFIG.control.endpoints[name];
-  if (CONFIG.control.mode === "fetch" && ep && ep.url) {
-    runFetch(ep);
-    return;
+  if (CONFIG.control.mode === "fetch" && ep) {
+    if (ep.hue) { runHueProxy(ep.hue); return; }
+    if (ep.url) { runFetch(ep); return; }
   }
   runShortcut(name);
 }

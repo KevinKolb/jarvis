@@ -21,7 +21,7 @@ Wants=network-online.target
 
 [Service]
 WorkingDirectory=$DIR
-ExecStart=/usr/bin/python3 -m http.server 80 --bind 0.0.0.0
+ExecStart=/usr/bin/python3 $DIR/server.py
 Restart=always
 User=root
 
