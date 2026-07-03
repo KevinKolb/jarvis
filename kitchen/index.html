@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#f7f4ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14110d" media="(prefers-color-scheme: dark)">
+  <title>Kitchen · JARVIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+  <main class="page" data-room="kitchen">
+    <a class="backlink" href="../">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      Rooms
+    </a>
+
+    <!-- Butler greeting -->
+    <section class="card butler">
+      <div class="butler-top">
+        <div class="avatar" aria-hidden="true">J</div>
+        <div class="avatar-meta">
+          <span class="avatar-name">Jarvis</span>
+          <span class="avatar-room"><span class="status-dot"></span>Kitchen · online</span>
+        </div>
+      </div>
+      <h1 class="greeting" id="greeting">Good evening.</h1>
+      <p class="tagline">At your service in the kitchen. How may I assist?</p>
+    </section>
+
+    <!-- Lights -->
+    <section class="section" aria-labelledby="lights-label">
+      <p class="section-label" id="lights-label">Lights</p>
+      <div class="btn-grid">
+        <button class="btn btn-primary" type="button" data-shortcut="Kitchen-Lights-On" data-toast="The kitchen lights are on.">
+          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg>
+          On
+        </button>
+        <button class="btn" type="button" data-shortcut="Kitchen-Lights-Off" data-toast="The kitchen lights are off.">
+          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M9.5 14a4 4 0 0 1-1-2.5"/><path d="m2 2 20 20"/><path d="M8.9 4.6A6 6 0 0 1 18 8c0 1-.2 2-1 3"/></svg>
+          Off
+        </button>
+        <button class="btn" type="button" data-shortcut="Kitchen-Scene-Cooking" data-toast="Setting the scene for cooking.">
+          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2c1 3-1 4-1 6a2 2 0 0 0 4 0c0-1 .5-2 .5-2 1.5 1.5 2.5 3 2.5 5a6 6 0 1 1-12 0c0-3 2-5 3.5-7C10.5 6 11 4 12 2Z"/></svg>
+          Scene: Cooking
+        </button>
+        <button class="btn" type="button" data-shortcut="Kitchen-Scene-Dinner" data-toast="Dimming for dinner.">
+          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          Scene: Dinner
+        </button>
+      </div>
+    </section>
+
+    <!-- SiriusXM -->
+    <section class="section" aria-labelledby="sxm-label">
+      <p class="section-label" id="sxm-label">SiriusXM <span class="hint">· kitchen speakers</span></p>
+      <div class="list" id="channel-list"></div>
+    </section>
+
+    <!-- Podcasts -->
+    <section class="section" aria-labelledby="pod-label">
+      <p class="section-label" id="pod-label">Podcasts</p>
+      <div class="list" id="podcast-list"></div>
+    </section>
+
+    <!-- Now Playing -->
+    <section class="section" aria-labelledby="np-label">
+      <p class="section-label" id="np-label">Now Playing</p>
+      <div class="card now-playing">
+        <div class="np-body">
+          <div class="np-kicker">Kitchen speakers</div>
+          <div class="np-track" id="np-track">Nothing playing</div>
+        </div>
+        <div class="np-controls">
+          <button class="np-btn" type="button" data-shortcut="Kitchen-Volume-Down" data-toast="Lowering the volume." aria-label="Volume down">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M17 12h6"/></svg>
+          </button>
+          <button class="np-btn" type="button" data-shortcut="Kitchen-Volume-Up" data-toast="Raising the volume." aria-label="Volume up">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M20 9v6M17 12h6"/></svg>
+          </button>
+          <button class="np-btn np-stop" type="button" data-shortcut="Kitchen-Stop" data-toast="Stopping playback in the kitchen." data-stop="true" aria-label="Stop">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+            Stop
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- QR to this page -->
+    <section class="card qr" aria-label="Kitchen page QR code">
+      <div class="qr-frame">
+        <img class="qr-code" src="../assets/kitchen-qr.svg" width="88" height="88" alt="QR code that opens this kitchen page">
+      </div>
+      <div class="qr-body">
+        <div class="qr-title">Scan or print this QR code to control the kitchen</div>
+        <span class="qr-url">KevinKolb.github.io/kitchen</span>
+        <button class="chip qr-print" type="button" data-print="true">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+          Print QR code
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Print-only sheet: SCAN TO CONTROL KITCHEN + QR + url -->
+  <div class="print-sheet" aria-hidden="true">
+    <h1 class="print-heading">SCAN TO CONTROL KITCHEN</h1>
+    <img class="print-qr" src="../assets/kitchen-qr.svg" alt="QR code for the kitchen page">
+    <p class="print-url">KevinKolb.github.io/kitchen</p>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="../assets/app.js"></script>
+</body>
+</html>
