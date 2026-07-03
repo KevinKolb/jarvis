@@ -183,7 +183,7 @@ function renderNP() {
   const vp = sonosVol + "%";
   if (npPlaying && npTrack) np.textContent = npTrack + " · " + vp;
   else if (npPlaying) np.textContent = vp;
-  else np.textContent = "Paused · " + vp;
+  else np.textContent = "Loading... · " + vp;
 }
 function setSonosVolume(level) {
   fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
