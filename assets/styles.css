@@ -374,6 +374,26 @@ button { font: inherit; color: inherit; }
   border: 3px solid var(--edge);
 }
 
+/* brightness row: 0% | slider | 100% */
+.bri-row { display: flex; align-items: stretch; gap: 0.5rem; }
+.bri-row .slider { flex: 1; min-width: 0; }
+.bri-end {
+  flex: none;
+  min-width: 48px;
+  padding: 0 0.4rem;
+  border: 3px solid var(--edge);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 90ms ease, box-shadow 90ms ease;
+}
+.bri-end:active { transform: translate(1px, 1px); box-shadow: none; }
+.bri-off { background: #000000; color: #b8b8b8; }
+
 /* color swatches */
 .swatches {
   display: grid;

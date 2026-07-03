@@ -310,7 +310,7 @@ function resetLightControls() {
   dirty = false;
   const slider = document.getElementById("brightness");
   const out = document.getElementById("bri-val");
-  if (slider) slider.value = 100;
+  if (slider) slider.value = 99;
   if (out) out.textContent = "100%";
   selectSwatch(document.querySelector('#swatches .swatch[data-name="White"]'));
   setTrackColor(white.css);
@@ -331,10 +331,16 @@ function updateToggle() {
   btn.dataset.state = lightsOn === true ? "on" : lightsOn === false ? "off" : "unknown";
   if (isOff) {                                // black or 0% -> off preview
     btn.style.background = "#000000";
-    btn.style.color = "#ffffff";
+    btn.style.color = "#b8b8b8";              // light gray, like the off hero
   } else if (pendingColor) {                  // show the selected color
     btn.style.background = pendingColor.css;
     btn.style.color = textColorFor(pendingColor.css);
+  }
+  // 100% button mirrors the staged color (like the Engage button)
+  const b100 = document.getElementById("bri-100");
+  if (b100 && pendingColor) {
+    b100.style.background = pendingColor.css;
+    b100.style.color = textColorFor(pendingColor.css);
   }
 }
 
@@ -391,13 +397,25 @@ function bindLightTools() {
   const out = document.getElementById("bri-val");
   if (slider) {
     slider.addEventListener("input", () => {
-      const pct = Number(slider.value);
+      const pct = Number(slider.value);            // 1..99
       if (out) out.textContent = pct + "%";
-      pendingBri = Math.round((pct / 100) * 254);   // 0 -> off on engage; always stage
+      pendingBri = Math.round((pct / 100) * 254);
       dirty = true;
       updateToggle();
     });
   }
+  const b0 = document.getElementById("bri-0");     // 0% = off
+  const b100 = document.getElementById("bri-100"); // 100% = brightest
+  if (b0) b0.addEventListener("click", () => {
+    pendingBri = 0; dirty = true;
+    if (out) out.textContent = "0%";
+    updateToggle();
+  });
+  if (b100) b100.addEventListener("click", () => {
+    pendingBri = 254; dirty = true;
+    if (out) out.textContent = "100%";
+    updateToggle();
+  });
 }
 
 /* ---------- Decide how an action runs ---------- */
