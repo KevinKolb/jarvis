@@ -281,25 +281,19 @@ function updateToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
   const txt = btn.querySelector(".toggle-txt");
+  if (txt) txt.textContent = "Engage";
   btn.style.background = "";
   btn.style.color = "";
   if (lightsOn === true) {
     btn.dataset.state = "on";
-    txt.textContent = "Turn Off";
   } else if (lightsOn === false) {
     btn.dataset.state = "off";
-    const slider = document.getElementById("brightness");
-    const pct = pendingBri != null
-      ? Math.round((pendingBri / 254) * 100)
-      : (slider ? Number(slider.value) : 100);
-    txt.textContent = "On " + pct + "%";
     if (pendingColor) {                       // preview the staged color
       btn.style.background = pendingColor.css;
       btn.style.color = textColorFor(pendingColor.css);
     }
   } else {
     btn.dataset.state = "unknown";
-    txt.textContent = "Toggle Lights";
   }
 }
 
