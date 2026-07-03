@@ -12,6 +12,7 @@ The bridge IP + token live HERE (on the Pi), not in the public web code.
 
 import json
 import os
+import re
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -19,6 +20,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 BRIDGE_IP = "192.168.86.151"
 HUE_USER  = "qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a"
 PORT      = 80
+# ---- Kitchen Sonos (stereo pair; this is the coordinator) ---------------
+SONOS_IP  = "192.168.86.150"
 # ------------------------------------------------------------------------
 
 
@@ -42,7 +45,38 @@ class Handler(SimpleHTTPRequestHandler):
         with urllib.request.urlopen(req, timeout=5) as resp:
             return resp.read()
 
+    def _sonos(self, service, action, inner):
+        """Send a SOAP action to the kitchen Sonos and return the XML text."""
+        env = ('<?xml version="1.0"?>'
+               '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+               's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
+               '<s:Body>%s</s:Body></s:Envelope>') % inner
+        url = "http://%s:1400/MediaRenderer/%s/Control" % (SONOS_IP, service)
+        req = urllib.request.Request(
+            url, data=env.encode(),
+            headers={"Content-Type": 'text/xml; charset="utf-8"',
+                     "SOAPAction": '"urn:schemas-upnp-org:service:%s:1#%s"' % (service, action)})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.read().decode("utf-8", "ignore")
+
+    def _json(self, obj, code=200):
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(obj).encode())
+
     def do_GET(self):
+        # Read Sonos volume:  GET /sonos/volume
+        if self.path == "/sonos/volume":
+            try:
+                xml = self._sonos("RenderingControl", "GetVolume",
+                    '<u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1">'
+                    '<InstanceID>0</InstanceID><Channel>Master</Channel></u:GetVolume>')
+                m = re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", xml)
+                self._json({"volume": int(m.group(1)) if m else 0})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
         # Read light state:  GET /hue/groups/82  ->  bridge /groups/82
         if self.path.startswith("/hue/"):
             try:

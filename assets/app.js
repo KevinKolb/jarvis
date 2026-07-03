@@ -135,6 +135,16 @@ const COLORS = [
   { name: "Violet", css: "#8e24aa", body: { on: true, hue: 54000, sat: 254 } },
 ];
 
+// Kitchen Sonos volume, shown in the hero after the lights blurb.
+function updateNowPlaying() {
+  const el = document.getElementById("np-line");
+  if (!el) return;
+  fetch("/sonos/volume", { cache: "no-store" })
+    .then((r) => r.json())
+    .then((d) => { el.textContent = "Now playing " + (d.volume != null ? d.volume : "—") + "%"; })
+    .catch(() => { el.textContent = "Now playing —"; });
+}
+
 // Real "Kitchen · online/offline" indicator, based on bridge reachability.
 function setConn(online) {
   const txt = document.getElementById("conn-text");
@@ -569,4 +579,5 @@ document.addEventListener("DOMContentLoaded", () => {
   bindLightTools();
   resetLightControls();     // default selection: white + 100%
   updateLightsStatus();
+  updateNowPlaying();
 });
