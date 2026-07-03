@@ -297,12 +297,14 @@ button { font: inherit; color: inherit; }
   background: var(--lights);
   color: #141410;
 }
-.btn-toggle[data-state="off"],          /* lights OFF -> tap turns them ON  */
+.btn-toggle[data-state="off"] {         /* lights OFF -> button says TURN ON */
+  background: #363636;
+  color: #ffffff;
+}
 .btn-toggle[data-state="unknown"] {
   background: var(--surface);
-  color: var(--ink);
+  color: var(--muted);
 }
-.btn-toggle[data-state="unknown"] { color: var(--muted); }
 
 /* ---------- Light tools: brightness + color ---------- */
 .light-tools {
