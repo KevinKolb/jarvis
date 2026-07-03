@@ -429,6 +429,61 @@ button { font: inherit; color: inherit; }
 .wifi-note svg { flex: none; }
 .wifi-note strong { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 2px; }
 
+/* ---------- Tech Jargon panel (home) ---------- */
+.tech {
+  margin-top: 1.1rem;
+  border: 3px solid var(--edge);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  font-family: "Space Mono", monospace;
+}
+.tech > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.tech > summary::-webkit-details-marker { display: none; }
+.tech > summary::before { content: "\25B8"; }        /* ▸ */
+.tech[open] > summary::before { content: "\25BE"; }  /* ▾ */
+.tech-body {
+  padding: 0 0.9rem 1rem;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.tech-body h3 {
+  margin: 1.1rem 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--on-accent, var(--paper));
+  background: var(--music);
+  --on-accent: #fff;
+  border: 2px solid var(--edge);
+  display: inline-block;
+  padding: 2px 7px;
+}
+.tech-body .kv { margin-bottom: 0.25rem; word-break: break-word; }
+.tech-body b { font-weight: 700; }
+.tech-body pre {
+  margin: 0.3rem 0 0;
+  padding: 0.6rem 0.7rem;
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  overflow-x: auto;
+  white-space: pre;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
 /* ---------- Chip (Print button) ---------- */
 .chip {
   -webkit-appearance: none;

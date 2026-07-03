@@ -61,6 +61,45 @@
         Connect to <strong>SpamNet</strong> Wi-Fi to control the house.
       </p>
     </section>
+
+    <details class="tech">
+      <summary>Tech Jargon</summary>
+      <div class="tech-body">
+        <h3>Network</h3>
+        <div class="kv">Wi-Fi ...... <b>SpamNet</b> (all devices must be on it)</div>
+        <div class="kv">Raspberry Pi ...... <b>192.168.86.147</b> (the web server)</div>
+        <div class="kv">Hue Bridge ...... <b>192.168.86.151</b> (kitchen = group 82)</div>
+        <div class="kv">Site ...... <b>http://192.168.86.147/</b></div>
+        <div class="kv">Kitchen ...... <b>http://192.168.86.147/kitchen/</b></div>
+
+        <h3>How it works</h3>
+        <div class="kv">The Pi runs <b>server.py</b> on port 80: it serves this website
+          and relays light commands.</div>
+        <div class="kv">Tap a light → phone POSTs to <b>/hue</b> on the Pi → Pi sends a
+          PUT to the Hue bridge. (Browsers can't call the bridge directly.)</div>
+        <div class="kv">Music buttons → <b>iOS Shortcuts</b> (Alexa has no local API).</div>
+        <div class="kv">Code lives at <b>github.com/KevinKolb/jarvis</b>. The Hue token
+          is only in server.py on the Pi, not in the public code.</div>
+
+        <h3>Update the Pi (from any computer on SpamNet)</h3>
+        <pre>ssh USERNAME@192.168.86.147
+cd jarvis
+git pull
+bash setup-pi.sh</pre>
+
+        <h3>Handy commands (run on the Pi)</h3>
+        <pre>sudo systemctl restart jarvis   # restart the server
+sudo systemctl status jarvis    # is it running?
+journalctl -u jarvis -f         # live log (Ctrl+C to quit)
+hostname -I                     # the Pi's IP address</pre>
+
+        <h3>If the lights stop working</h3>
+        <div class="kv">1. Is the phone on <b>SpamNet</b>?</div>
+        <div class="kv">2. Is the Pi powered on? (it must stay on)</div>
+        <div class="kv">3. Did the Pi's address change after a reboot? If the site won't
+          load, run <b>hostname -I</b> on the Pi to get the new address.</div>
+      </div>
+    </details>
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
