@@ -462,6 +462,7 @@ button { font: inherit; color: inherit; }
 }
 .chan-btn:hover { transform: translate(-2px, -2px); box-shadow: var(--sh); }
 .chan-btn:active { transform: translate(2px, 2px); box-shadow: none; background: var(--music); color: #fff; }
+.share-btn.on { background: var(--music); color: #fff; }   /* grouped to kitchen */
 
 /* ---------- Footer (Rooms + connection status) ---------- */
 .page-footer {
@@ -665,7 +666,7 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.02em;
   transition: transform 90ms ease, box-shadow 90ms ease;
 }
-.room-card .icon { color: var(--ink); }
+.room-card .icon { color: inherit; }
 .room-card:hover { transform: translate(-2px, -2px); box-shadow: var(--sh-lg); }
 .room-card:active { transform: translate(3px, 3px); box-shadow: var(--sh-sm); }
 .room-card .soon {

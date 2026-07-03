@@ -24,6 +24,14 @@ PORT      = 80
 # ---- Kitchen Sonos (stereo pair; .41 = the pair's coordinator) ----------
 SONOS_IP   = "192.168.86.41"
 SONOS_UUID = "RINCON_7828CAE1ACD801400"   # coordinator (for queue playback)
+SONOS_ROOMS = [                            # other rooms you can share kitchen audio to
+    ("Living Room", "192.168.86.34"),
+    ("Bedroom",     "192.168.86.156"),
+    ("Bathroom",    "192.168.86.159"),
+    ("Office",      "192.168.86.43"),
+    ("Lounge",      "192.168.86.48"),
+    ("Entryway",    "192.168.86.38"),
+]
 # ------------------------------------------------------------------------
 
 
@@ -114,6 +122,34 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
 
+    def _zone_groups(self):
+        """Return [(coordinator_uuid, [member_ips])] from the Sonos topology."""
+        env = ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+               's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
+               '<u:GetZoneGroupState xmlns:u="urn:schemas-upnp-org:service:ZoneGroupTopology:1"></u:GetZoneGroupState>'
+               '</s:Body></s:Envelope>')
+        req = urllib.request.Request("http://%s:1400/ZoneGroupTopology/Control" % SONOS_IP, data=env.encode(),
+            headers={"Content-Type": 'text/xml; charset="utf-8"',
+                     "SOAPAction": '"urn:schemas-upnp-org:service:ZoneGroupTopology:1#GetZoneGroupState"'})
+        xml = urllib.request.urlopen(req, timeout=6).read().decode("utf-8", "ignore")
+        m = re.search(r"<ZoneGroupState>(.*?)</ZoneGroupState>", xml, re.S)
+        state = html.unescape(m.group(1)) if m else ""
+        out = []
+        for coord, body in re.findall(r'<ZoneGroup[^>]*Coordinator="([^"]+)"[^>]*>(.*?)</ZoneGroup>', state, re.S):
+            ips = re.findall(r'<ZoneGroupMember[^>]*Location="http://([\d.]+):1400', body)
+            out.append((coord, ips))
+        return out
+
+    def _avt_ip(self, ip, action, inner):
+        """AVTransport SOAP to a specific speaker IP (used for grouping)."""
+        env = ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+               's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>%s</s:Body></s:Envelope>') % inner
+        req = urllib.request.Request("http://%s:1400/MediaRenderer/AVTransport/Control" % ip, data=env.encode(),
+            headers={"Content-Type": 'text/xml; charset="utf-8"',
+                     "SOAPAction": '"urn:schemas-upnp-org:service:AVTransport:1#%s"' % action})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            return r.read()
+
     def _json(self, obj, code=200):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -189,6 +225,19 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
+
+        # Rooms + whether each is currently grouped to the kitchen
+        if self.path == "/sonos/rooms":
+            try:
+                kitchen_ips = set()
+                for coord, ips in self._zone_groups():
+                    if coord == SONOS_UUID:
+                        kitchen_ips = set(ips)
+                rooms = [{"name": n, "grouped": ip in kitchen_ips} for (n, ip) in SONOS_ROOMS]
+                self._json({"rooms": rooms})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
         # Read light state:  GET /hue/groups/82  ->  bridge /groups/82
         if self.path.startswith("/hue/"):
             try:
@@ -230,6 +279,26 @@ class Handler(SimpleHTTPRequestHandler):
                     '<u:SetGroupMute xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
                     '<InstanceID>0</InstanceID><DesiredMute>%d</DesiredMute></u:SetGroupMute>' % mute)
                 self._json({"ok": True, "mute": bool(mute)})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Group / ungroup a room to the kitchen:  POST /sonos/group  {"room","join"}
+        if self.path == "/sonos/group":
+            try:
+                p = json.loads(raw or b"{}")
+                room, join = p.get("room"), bool(p.get("join"))
+                ip = dict(SONOS_ROOMS).get(room)
+                if not ip:
+                    raise Exception("unknown room: %s" % room)
+                if join:
+                    self._avt_ip(ip, "SetAVTransportURI",
+                        '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+                        '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+                else:
+                    self._avt_ip(ip, "BecomeCoordinatorOfStandaloneGroup",
+                        '<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:BecomeCoordinatorOfStandaloneGroup>')
+                self._json({"ok": True, "room": room, "grouped": join})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return

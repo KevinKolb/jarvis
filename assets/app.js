@@ -200,6 +200,32 @@ function playFavorite(fav, label) {
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
+function renderShare() {
+  const host = document.getElementById("row-share");
+  if (!host) return;
+  fetch("/sonos/rooms", { cache: "no-store" })
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d || !d.rooms) return;
+      host.innerHTML = "";
+      d.rooms.forEach((rm) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "chan-btn share-btn";
+        b.textContent = rm.name;
+        if (rm.grouped) b.classList.add("on");
+        b.addEventListener("click", () => {
+          const join = !b.classList.contains("on");
+          b.classList.toggle("on", join);
+          fetch("/sonos/group", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ room: rm.name, join: join }), keepalive: true }).catch(() => {});
+          toast(join ? "Sharing kitchen audio to " + rm.name + "." : "Stopped sharing to " + rm.name + ".");
+        });
+        host.appendChild(b);
+      });
+    })
+    .catch(() => {});
+}
 function renderMusic() {
   [["row-radio", MUSIC.radio], ["row-jukebox", MUSIC.jukebox], ["row-podcasts", MUSIC.podcasts]]
     .forEach(([id, list]) => {
@@ -676,6 +702,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resetLightControls();     // default selection: white + 100%
   bindVolume();
   renderMusic();
+  renderShare();
   updateLightsStatus();
   updateSonos();
   window.setInterval(updateSonos, 10000);   // keep now-playing/volume fresh
