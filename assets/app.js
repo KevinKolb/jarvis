@@ -105,6 +105,14 @@ function runHueProxy(hue) {
 /* ---------- Read + show current light status ---------- */
 const LIGHTS_GROUP = "82";   // kitchen Hue group
 let lightsOn = null;         // true / false / null (unknown)
+let pendingColor = null;     // { body, css } chosen while OFF, applied on next turn-on
+let selectedSwatchEl = null; // currently highlighted swatch
+
+function selectSwatch(el) {
+  if (selectedSwatchEl) selectedSwatchEl.classList.remove("sel");
+  selectedSwatchEl = el;
+  if (el) el.classList.add("sel");
+}
 
 // Send a state change to the kitchen group via the Pi relay.
 function runHue(body) {
@@ -126,10 +134,11 @@ const COLORS = [
 
 // Real "Kitchen · online/offline" indicator, based on bridge reachability.
 function setConn(online) {
-  const dot = document.getElementById("conn-dot");
   const txt = document.getElementById("conn-text");
-  if (dot) dot.dataset.conn = online ? "online" : "offline";
-  if (txt) txt.textContent = online ? "online" : "offline";
+  if (txt) {
+    txt.textContent = online ? "online" : "offline";
+    txt.dataset.conn = online ? "online" : "offline";
+  }
 }
 
 // Approximate the group's current light color as a CSS color for the square.
@@ -171,7 +180,7 @@ function updateLightsStatus() {
         if (square) square.style.background = hueColor(g.action);
       } else {
         if (text) text.textContent = "Lights off";
-        if (square) square.style.background = "#363636";
+        if (square) square.style.background = pendingColor ? pendingColor.css : "#363636";
       }
       updateToggle();
     })
@@ -200,8 +209,16 @@ function bindLightsToggle() {
   if (!btn) return;
   btn.addEventListener("click", () => {
     const turningOn = !lightsOn;                         // null -> turn ON
-    runAction(turningOn ? "Kitchen Lights On" : "Kitchen Lights Off");
-    toast(turningOn ? "The kitchen lights are on." : "The kitchen lights are off.");
+    if (turningOn) {
+      if (pendingColor) { runHue(pendingColor.body); pendingColor = null; }
+      else runAction("Kitchen Lights On");
+      toast("The kitchen lights are on.");
+    } else {
+      runAction("Kitchen Lights Off");
+      pendingColor = null;
+      selectSwatch(null);
+      toast("The kitchen lights are off.");
+    }
     lightsOn = turningOn;                                // optimistic
     updateToggle();
     window.setTimeout(updateLightsStatus, 500);          // confirm from bridge
@@ -220,11 +237,20 @@ function bindLightTools() {
       b.title = c.name;
       b.setAttribute("aria-label", c.name);
       b.addEventListener("click", () => {
-        runHue(c.body);
-        toast("Kitchen lights set to " + c.name.toLowerCase() + ".");
-        lightsOn = true;
-        updateToggle();
-        window.setTimeout(updateLightsStatus, 500);
+        selectSwatch(b);
+        const square = document.getElementById("lights-square");
+        if (lightsOn) {
+          // Lights on: apply the color now.
+          runHue(c.body);
+          pendingColor = null;
+          toast("Kitchen lights set to " + c.name.toLowerCase() + ".");
+          window.setTimeout(updateLightsStatus, 500);
+        } else {
+          // Lights off: just stage the color for the next turn-on.
+          pendingColor = { body: c.body, css: c.css };
+          if (square) square.style.background = c.css;
+          toast(c.name + " ready — applies when the lights turn on.");
+        }
       });
       swatches.appendChild(b);
     });

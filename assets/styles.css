@@ -186,7 +186,6 @@ button { font: inherit; color: inherit; }
 .kitchen-conn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
   font-family: "Space Mono", monospace;
   font-size: 0.72rem;
   font-weight: 700;
@@ -194,6 +193,9 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.1em;
   color: var(--muted);
 }
+#conn-text { color: var(--muted); }
+#conn-text[data-conn="online"] { color: var(--ink); }
+#conn-text[data-conn="offline"] { color: var(--muted); }
 .kitchen-title {
   margin: 0.5rem 0 0;
   font-weight: 700;
@@ -400,6 +402,7 @@ button { font: inherit; color: inherit; }
 }
 .swatch:hover { transform: translate(-2px, -2px); box-shadow: var(--sh); }
 .swatch:active { transform: translate(2px, 2px); box-shadow: none; }
+.swatch.sel { outline: 4px solid var(--ink); outline-offset: 2px; }
 
 /* ---------- Lists (SiriusXM / Podcasts) ---------- */
 .list {
