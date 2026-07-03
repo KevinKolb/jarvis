@@ -147,6 +147,9 @@ const MUSIC = {
     { label: "Classic Vinyl", fav: "CH 26 - Classic Vinyl" },
     { label: "Beatles", fav: "CH 18 - The Beatles Channel" },
   ],
+  artists: [
+    { label: "Warren Zevon", fav: "Warren Zevon" },
+  ],
   jukebox: [
     { label: "Foot of Canal St", fav: "Foot of Canal Street" },
     { label: "Sledgehammer", apple: { kind: "song", id: "987872731", title: "Sledgehammer" } },
@@ -263,7 +266,7 @@ function renderShare() {
     .catch(() => {});
 }
 function renderMusic() {
-  [["row-radio", MUSIC.radio], ["row-jukebox", MUSIC.jukebox], ["row-albums", MUSIC.albums], ["row-playlists", MUSIC.playlists], ["row-podcasts", MUSIC.podcasts]]
+  [["row-radio", MUSIC.radio], ["row-artists", MUSIC.artists], ["row-jukebox", MUSIC.jukebox], ["row-albums", MUSIC.albums], ["row-playlists", MUSIC.playlists], ["row-podcasts", MUSIC.podcasts]]
     .forEach(([id, list]) => {
       const host = document.getElementById(id);
       if (!host) return;
