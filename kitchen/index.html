@@ -37,7 +37,7 @@
     <section class="section" aria-labelledby="lights-label">
       <p class="section-label" id="lights-label">Lights</p>
       <div class="btn-grid">
-        <button class="btn btn-primary" type="button" data-shortcut="Kitchen-Lights-On" data-toast="The kitchen lights are on.">
+        <button class="btn btn-primary" type="button" data-shortcut="Kitchen Lights On" data-toast="The kitchen lights are on.">
           <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg>
           On
         </button>
@@ -109,9 +109,11 @@
 
   <!-- Print-only sheet: SCAN TO CONTROL KITCHEN + QR + url -->
   <div class="print-sheet" aria-hidden="true">
-    <h1 class="print-heading">SCAN TO CONTROL KITCHEN</h1>
-    <img class="print-qr" src="../assets/kitchen-qr.svg" alt="QR code for the kitchen page">
-    <p class="print-url">KevinKolb.github.io/kitchen</p>
+    <div class="print-card">
+      <h1 class="print-heading">SCAN TO CONTROL KITCHEN</h1>
+      <img class="print-qr" src="../assets/kitchen-qr.svg" alt="QR code for the kitchen page">
+      <p class="print-url">KevinKolb.github.io/kitchen</p>
+    </div>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

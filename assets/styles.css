@@ -458,33 +458,41 @@ button { font: inherit; color: inherit; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    text-align: center;
     min-height: 100vh;
-    padding: 0.5in;
+    padding: 0.4in;
     color: #000;
+  }
+  .print-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0.6in 0.7in;
+    border: 3pt solid #000;
+    border-radius: 0.22in;
   }
   .print-heading {
     font-family: "Inter", sans-serif;
     font-weight: 600;
-    font-size: 26pt;
+    font-size: 30pt;
     letter-spacing: 0.06em;
-    margin: 0 0 0.4in;
+    margin: 0 0 0.45in;
   }
   .print-qr {
-    width: 3.4in;
-    height: 3.4in;
+    width: 4in;
+    height: 4in;
     color: #000;                 /* QR modules */
-    padding: 0.18in;
+    padding: 0.2in;
     background: #fff;
-    border: 1.5pt solid #000;
-    border-radius: 0.12in;
+    border: 2pt solid #000;
+    border-radius: 0.14in;
   }
   .print-url {
     font-family: "Inter", sans-serif;
-    font-size: 15pt;
+    font-size: 18pt;
     font-weight: 600;
     letter-spacing: 0.02em;
-    margin: 0.35in 0 0;
+    margin: 0.4in 0 0;
   }
 }
 
