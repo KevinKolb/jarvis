@@ -196,13 +196,41 @@ function updateLightsStatus() {
     });
 }
 
+// Pick black or white text for a given hex background (by luminance).
+function textColorFor(css) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(css || "");
+  if (!m) return "#141410";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#141410" : "#ffffff";
+}
+
 /* ---------- On/Off toggle: label + action follow current state ---------- */
 function updateToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
   const txt = btn.querySelector(".toggle-txt");
-  btn.dataset.state = lightsOn === null ? "unknown" : lightsOn ? "on" : "off";
-  txt.textContent = lightsOn === null ? "Toggle Lights" : lightsOn ? "Turn Off" : "Turn On";
+  btn.style.background = "";
+  btn.style.color = "";
+  if (lightsOn === true) {
+    btn.dataset.state = "on";
+    txt.textContent = "Turn Off";
+  } else if (lightsOn === false) {
+    btn.dataset.state = "off";
+    const slider = document.getElementById("brightness");
+    const pct = pendingBri != null
+      ? Math.round((pendingBri / 254) * 100)
+      : (slider ? Number(slider.value) : 100);
+    txt.textContent = "On " + pct + "%";
+    if (pendingColor) {                       // preview the staged color
+      btn.style.background = pendingColor.css;
+      btn.style.color = textColorFor(pendingColor.css);
+    }
+  } else {
+    btn.dataset.state = "unknown";
+    txt.textContent = "Toggle Lights";
+  }
 }
 
 function bindLightsToggle() {
@@ -255,6 +283,7 @@ function bindLightTools() {
           // Lights off: just stage the color for the next turn-on.
           pendingColor = { body: c.body, css: c.css };
           if (square) square.style.background = c.css;
+          updateToggle();
           toast(c.name + " ready — applies when the lights turn on.");
         }
       });
@@ -272,6 +301,7 @@ function bindLightTools() {
       const bri = Math.max(1, Math.round((pct / 100) * 254));
       if (!lightsOn) {
         pendingBri = bri;                    // lights off: stage for next turn-on
+        updateToggle();
         return;
       }
       clearTimeout(t);                       // throttle while dragging
