@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#f7f4ee" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14110d" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f1e6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14140f" media="(prefers-color-scheme: dark)">
   <title>Kitchen · JARVIS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/styles.css">
 </head>
 <body>
@@ -34,7 +34,7 @@
     </section>
 
     <!-- Lights -->
-    <section class="section" aria-labelledby="lights-label">
+    <section class="section theme-lights" aria-labelledby="lights-label">
       <p class="section-label" id="lights-label">Lights</p>
       <div class="btn-grid">
         <button class="btn" type="button" data-shortcut="Kitchen Lights On" data-toast="The kitchen lights are on.">
@@ -57,19 +57,19 @@
     </section>
 
     <!-- SiriusXM -->
-    <section class="section" aria-labelledby="sxm-label">
+    <section class="section theme-music" aria-labelledby="sxm-label">
       <p class="section-label" id="sxm-label">SiriusXM <span class="hint">· kitchen speakers</span></p>
       <div class="list" id="channel-list"></div>
     </section>
 
     <!-- Podcasts -->
-    <section class="section" aria-labelledby="pod-label">
+    <section class="section theme-music" aria-labelledby="pod-label">
       <p class="section-label" id="pod-label">Podcasts</p>
       <div class="list" id="podcast-list"></div>
     </section>
 
     <!-- Now Playing -->
-    <section class="section" aria-labelledby="np-label">
+    <section class="section theme-music" aria-labelledby="np-label">
       <p class="section-label" id="np-label">Now Playing</p>
       <div class="card now-playing">
         <div class="np-body">
