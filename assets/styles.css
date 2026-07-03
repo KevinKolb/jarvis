@@ -349,12 +349,12 @@ button { font: inherit; color: inherit; }
 }
 .slider::-webkit-slider-runnable-track {
   height: 22px;
-  background: var(--track-color, var(--lights));
+  background: linear-gradient(to right, #000000, var(--track-color, var(--lights)));
   border: 3px solid var(--edge);
 }
 .slider::-moz-range-track {
   height: 22px;
-  background: var(--track-color, var(--lights));
+  background: linear-gradient(to right, #000000, var(--track-color, var(--lights)));
   border: 3px solid var(--edge);
 }
 .slider::-webkit-slider-thumb {
