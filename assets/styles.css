@@ -197,6 +197,33 @@ button { font: inherit; color: inherit; }
 }
 .section-label .hint { font-weight: 400; opacity: 0.85; }
 
+/* ---------- Lights status line ---------- */
+.lights-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: -0.2rem 0 0.8rem;
+  padding: 0.4rem 0.7rem;
+  border: 3px solid var(--edge);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.lights-status .dot {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--edge);
+  background: var(--muted);
+  flex: none;
+}
+.lights-status[data-state="on"] .dot { background: var(--lights); }
+.lights-status[data-state="off"] .dot { background: var(--surface); }
+.lights-status[data-state="unknown"] { opacity: 0.7; }
+
 /* ---------- Buttons (Lights) ---------- */
 .btn-grid {
   display: grid;
@@ -228,6 +255,26 @@ button { font: inherit; color: inherit; }
 .btn .icon { flex: none; color: currentColor; }
 .btn:hover { transform: translate(-2px, -2px); box-shadow: var(--sh-lg); }
 .btn:active { transform: translate(3px, 3px); box-shadow: var(--sh-sm); }
+
+/* On/Off toggle — full width, colored by current light state */
+.btn-toggle {
+  width: 100%;
+  min-height: 74px;
+  justify-content: center;
+  gap: 0.65rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+}
+.btn-toggle[data-state="on"] {          /* lights ON  -> tap turns them OFF */
+  background: var(--lights);
+  color: #141410;
+}
+.btn-toggle[data-state="off"],          /* lights OFF -> tap turns them ON  */
+.btn-toggle[data-state="unknown"] {
+  background: var(--surface);
+  color: var(--ink);
+}
+.btn-toggle[data-state="unknown"] { color: var(--muted); }
 
 /* ---------- Lists (SiriusXM / Podcasts) ---------- */
 .list {

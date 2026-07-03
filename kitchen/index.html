@@ -36,24 +36,13 @@
     <!-- Lights -->
     <section class="section theme-lights" aria-labelledby="lights-label">
       <p class="section-label" id="lights-label">Lights</p>
-      <div class="btn-grid">
-        <button class="btn" type="button" data-shortcut="Kitchen Lights On" data-toast="The kitchen lights are on.">
-          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg>
-          On
-        </button>
-        <button class="btn" type="button" data-shortcut="Kitchen Lights Off" data-toast="The kitchen lights are off.">
-          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M9.5 14a4 4 0 0 1-1-2.5"/><path d="m2 2 20 20"/><path d="M8.9 4.6A6 6 0 0 1 18 8c0 1-.2 2-1 3"/></svg>
-          Off
-        </button>
-        <button class="btn" type="button" data-shortcut="Kitchen-Scene-Cooking" data-toast="Setting the scene for cooking.">
-          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2c1 3-1 4-1 6a2 2 0 0 0 4 0c0-1 .5-2 .5-2 1.5 1.5 2.5 3 2.5 5a6 6 0 1 1-12 0c0-3 2-5 3.5-7C10.5 6 11 4 12 2Z"/></svg>
-          Scene: Cooking
-        </button>
-        <button class="btn" type="button" data-shortcut="Kitchen-Scene-Dinner" data-toast="Dimming for dinner.">
-          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-          Scene: Dinner
-        </button>
+      <div class="lights-status" id="lights-status" data-state="unknown">
+        <span class="dot"></span><span class="txt">Checking lights…</span>
       </div>
+      <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle kitchen lights">
+        <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+        <span class="toggle-txt">Toggle Lights</span>
+      </button>
     </section>
 
     <!-- SiriusXM -->

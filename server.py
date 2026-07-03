@@ -27,6 +27,34 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def _bridge(self, method, bridge_path, body=None):
+        """Forward a request to the Hue bridge and return its raw bytes."""
+        url = "http://{}/api/{}{}".format(BRIDGE_IP, HUE_USER, bridge_path)
+        req = urllib.request.Request(
+            url, data=body, method=method,
+            headers={"Content-Type": "application/json"} if body else {},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.read()
+
+    def do_GET(self):
+        # Read light state:  GET /hue/groups/82  ->  bridge /groups/82
+        if self.path.startswith("/hue/"):
+            try:
+                result = self._bridge("GET", self.path[4:])
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(result)
+            except Exception as exc:
+                self.send_response(502)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(("Hue relay error: %s" % exc).encode())
+            return
+        # Otherwise serve website files normally.
+        return super().do_GET()
+
     def do_POST(self):
         if self.path.rstrip("/") != "/hue":
             self.send_error(404)
@@ -38,13 +66,7 @@ class Handler(SimpleHTTPRequestHandler):
             path = payload.get("path", "")            # e.g. /groups/82/action
             body = json.dumps(payload.get("body", {})).encode()
 
-            url = "http://{}/api/{}{}".format(BRIDGE_IP, HUE_USER, path)
-            req = urllib.request.Request(
-                url, data=body, method="PUT",
-                headers={"Content-Type": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                result = resp.read()
+            result = self._bridge("PUT", path, body)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

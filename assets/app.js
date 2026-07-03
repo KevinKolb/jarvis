@@ -41,13 +41,11 @@ const CONFIG = {
     mode: "fetch",             // "shortcut" | "fetch"
 
     endpoints: {
-      // Kitchen = Hue group 82. On/Off toggle it; Cooking = bright cool
-      // white, Dinner = dim warm. `path` + `body` are forwarded to the
-      // bridge by the Pi relay. Tweak brightness/color here.
-      "Kitchen Lights On":     { hue: { path: "/groups/82/action", body: { on: true } } },
-      "Kitchen Lights Off":    { hue: { path: "/groups/82/action", body: { on: false } } },
-      "Kitchen-Scene-Cooking": { hue: { path: "/groups/82/action", body: { on: true, bri: 254, ct: 250 } } },
-      "Kitchen-Scene-Dinner":  { hue: { path: "/groups/82/action", body: { on: true, bri: 76, ct: 450 } } },
+      // Kitchen = Hue group 82. The toggle button sends On or Off based on
+      // the light's current state. `path` + `body` are forwarded to the
+      // bridge by the Pi relay.
+      "Kitchen Lights On":  { hue: { path: "/groups/82/action", body: { on: true } } },
+      "Kitchen Lights Off": { hue: { path: "/groups/82/action", body: { on: false } } },
 
       // Non-Hue example (Home Assistant webhook, direct https):
       //   "Kitchen Lights On": { url: "https://<YOUR-HA>/api/webhook/kitchen_lights_on" },
@@ -102,6 +100,64 @@ function runHueProxy(hue) {
     body: JSON.stringify(hue),
     keepalive: true,
   }).catch(() => { /* relay unreachable — Pi off, or not on SpamNet */ });
+}
+
+/* ---------- Read + show current light status ---------- */
+const LIGHTS_GROUP = "82";   // kitchen Hue group
+let lightsOn = null;         // true / false / null (unknown)
+
+function updateLightsStatus() {
+  const el = document.getElementById("lights-status");
+  fetch("/hue/groups/" + LIGHTS_GROUP, { cache: "no-store" })
+    .then((r) => r.json())
+    .then((g) => {
+      const state = (g && g.state) || {};
+      const on = !!state.any_on;
+      const bri = g && g.action ? g.action.bri : null;
+      lightsOn = on;
+      if (el) {
+        el.dataset.state = on ? "on" : "off";
+        const txt = el.querySelector(".txt");
+        if (!on) {
+          txt.textContent = "Lights are OFF";
+        } else {
+          let label = state.all_on ? "Lights are ON" : "Some lights ON";
+          if (typeof bri === "number") label += " · " + Math.round((bri / 254) * 100) + "%";
+          txt.textContent = label;
+        }
+      }
+      updateToggle();
+    })
+    .catch(() => {
+      lightsOn = null;
+      if (el) {
+        el.dataset.state = "unknown";
+        el.querySelector(".txt").textContent = "Light status unavailable";
+      }
+      updateToggle();
+    });
+}
+
+/* ---------- On/Off toggle: label + action follow current state ---------- */
+function updateToggle() {
+  const btn = document.getElementById("lights-toggle");
+  if (!btn) return;
+  const txt = btn.querySelector(".toggle-txt");
+  btn.dataset.state = lightsOn === null ? "unknown" : lightsOn ? "on" : "off";
+  txt.textContent = lightsOn === null ? "Toggle Lights" : lightsOn ? "Turn Off" : "Turn On";
+}
+
+function bindLightsToggle() {
+  const btn = document.getElementById("lights-toggle");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const turningOn = !lightsOn;                         // null -> turn ON
+    runAction(turningOn ? "Kitchen Lights On" : "Kitchen Lights Off");
+    toast(turningOn ? "The kitchen lights are on." : "The kitchen lights are off.");
+    lightsOn = turningOn;                                // optimistic
+    updateToggle();
+    window.setTimeout(updateLightsStatus, 500);          // confirm from bridge
+  });
 }
 
 /* ---------- Decide how an action runs ---------- */
@@ -220,6 +276,10 @@ function bindShortcutButtons() {
       }
       if (btn.dataset.toast) toast(btn.dataset.toast);
       runAction(btn.dataset.shortcut, btn);
+      // If this was a light control, re-read the status shortly after.
+      if (btn.closest(".theme-lights")) {
+        window.setTimeout(updateLightsStatus, 500);
+      }
     });
   });
 }
@@ -247,4 +307,6 @@ document.addEventListener("DOMContentLoaded", () => {
   bindShortcutButtons();
   bindPrint();
   bindSoonRooms();
+  bindLightsToggle();
+  updateLightsStatus();
 });
