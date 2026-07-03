@@ -194,16 +194,20 @@ function textForRgb(rgb) {
   return lum > 0.6 ? "#141410" : "#ffffff";
 }
 // Paint the hero background/text to reflect the current light color.
+function setTrackColor(css) {
+  const slider = document.getElementById("brightness");
+  if (slider) slider.style.setProperty("--track-color", css);
+}
 function paintHero(action, on) {
   const hero = document.getElementById("kitchen-hero");
-  if (!hero) return;
   if (on && action) {
     const rgb = lightRGB(action);
-    hero.style.background = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
-    hero.style.color = textForRgb(rgb);
+    const css = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+    if (hero) { hero.style.background = css; hero.style.color = textForRgb(rgb); }
+    setTrackColor(css);
   } else {
-    hero.style.background = "";   // default card surface when off/unknown
-    hero.style.color = "";
+    if (hero) { hero.style.background = ""; hero.style.color = ""; }
+    setTrackColor(pendingColor ? pendingColor.css : "#ffffff");
   }
 }
 
@@ -269,6 +273,7 @@ function resetLightControls() {
   if (slider) slider.value = 100;
   if (out) out.textContent = "100%";
   selectSwatch(document.querySelector("#swatches .swatch"));
+  setTrackColor(white.css);
 }
 
 /* ---------- On/Off toggle: label + action follow current state ---------- */
@@ -335,6 +340,7 @@ function bindLightTools() {
       b.setAttribute("aria-label", c.name);
       b.addEventListener("click", () => {
         selectSwatch(b);
+        setTrackColor(c.css);              // brightness bar takes the color
         if (lightsOn) {
           // Lights on: apply the color now.
           runHue(c.body);
