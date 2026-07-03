@@ -106,9 +106,10 @@ function runHueProxy(hue) {
 const LIGHTS_GROUP = "82";   // kitchen Hue group
 const LIGHTS_SAMPLE = "22";  // a representative bulb in that group (true color)
 let lightsOn = null;         // true / false / null (unknown)
-let pendingColor = null;     // { body, css } chosen while OFF, applied on next turn-on
-let pendingBri = null;       // brightness chosen while OFF, applied on next turn-on
+let pendingColor = null;     // { body, css } current color selection (default white)
+let pendingBri = 254;        // current brightness selection (default 100%)
 let selectedSwatchEl = null; // currently highlighted swatch
+let dirty = false;           // selection changed since last engage / load?
 
 function selectSwatch(el) {
   if (selectedSwatchEl) selectedSwatchEl.classList.remove("sel");
@@ -178,16 +179,30 @@ function xyToRgb(x, y) {
   const cl = (c) => Math.round(Math.max(0, Math.min(1, c)) * 255);
   return [cl(r), cl(g), cl(b)];
 }
+function rgbToHue(rgb) {
+  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (d === 0) return 0;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+// Pure light color (hue only) for the hero: red is red — brightness/sat ignored.
 function lightRGB(a) {
   if (!a) return [204, 204, 204];
-  if (a.colormode === "xy" && Array.isArray(a.xy)) return xyToRgb(a.xy[0], a.xy[1]);
   if (a.colormode === "ct" || a.sat == null || a.sat < 20) {
     const ct = a.ct || 300;                      // white: warm/cool by color temp
     const f = Math.max(0, Math.min(1, (ct - 153) / (500 - 153)));
     const mix = (p, q) => Math.round(p + (q - p) * f);
     return [mix(219, 255), mix(233, 214), mix(255, 160)];
   }
-  return hslToRgb((a.hue || 0) / 65535, (a.sat || 0) / 254, 0.52);
+  const hueDeg = (a.colormode === "xy" && Array.isArray(a.xy))
+    ? rgbToHue(xyToRgb(a.xy[0], a.xy[1]))
+    : ((a.hue || 0) / 65535) * 360;
+  return hslToRgb(hueDeg / 360, 1, 0.5);         // pure, fully saturated
 }
 function textForRgb(rgb) {
   const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
@@ -198,16 +213,15 @@ function setTrackColor(css) {
   const slider = document.getElementById("brightness");
   if (slider) slider.style.setProperty("--track-color", css);
 }
-function paintHero(action, on) {
+function paintHero(on) {
   const hero = document.getElementById("kitchen-hero");
-  if (on && action) {
-    const rgb = lightRGB(action);
-    const css = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
-    if (hero) { hero.style.background = css; hero.style.color = textForRgb(rgb); }
-    setTrackColor(css);
+  if (!hero) return;
+  if (on && pendingColor) {
+    hero.style.background = pendingColor.css;   // exact selected color, pure
+    hero.style.color = textColorFor(pendingColor.css);
   } else {
-    if (hero) { hero.style.background = ""; hero.style.color = ""; }
-    setTrackColor(pendingColor ? pendingColor.css : "#ffffff");
+    hero.style.background = "";
+    hero.style.color = "";
   }
 }
 
@@ -225,14 +239,6 @@ function updateLightsStatus() {
         ? lstate.bri
         : (grp && grp.action ? grp.action.bri : null);
       lightsOn = on;
-      // Keep the brightness slider in sync with the real value (while on).
-      const slider = document.getElementById("brightness");
-      const briOut = document.getElementById("bri-val");
-      if (on && typeof bri === "number" && slider) {
-        const pct = Math.round((bri / 254) * 100);
-        slider.value = pct;
-        if (briOut) briOut.textContent = pct + "%";
-      }
       const text = document.getElementById("lights-line-text");
       if (on) {
         const pct = typeof bri === "number" ? Math.round((bri / 254) * 100) : null;
@@ -240,7 +246,7 @@ function updateLightsStatus() {
       } else if (text) {
         text.textContent = "Lights off";
       }
-      paintHero(on ? lstate : null, on);   // real bulb color, pure hue (bri ignored)
+      paintHero(on);
       updateToggle();
     })
     .catch(() => {
@@ -248,7 +254,7 @@ function updateLightsStatus() {
       lightsOn = null;
       const text = document.getElementById("lights-line-text");
       if (text) text.textContent = "Lights —";
-      paintHero(null, false);
+      paintHero(false);
       updateToggle();
     });
 }
@@ -266,14 +272,16 @@ function textColorFor(css) {
 // When the lights go off, reset the controls to defaults: white + 100%.
 function resetLightControls() {
   const white = COLORS[0];                          // white is the first swatch
-  pendingColor = { body: white.body, css: white.css };
+  pendingColor = { body: white.body, css: white.css, name: white.name };
   pendingBri = 254;                                 // 100%
+  dirty = false;
   const slider = document.getElementById("brightness");
   const out = document.getElementById("bri-val");
   if (slider) slider.value = 100;
   if (out) out.textContent = "100%";
   selectSwatch(document.querySelector("#swatches .swatch"));
   setTrackColor(white.css);
+  updateToggle();
 }
 
 /* ---------- On/Off toggle: label + action follow current state ---------- */
@@ -281,11 +289,13 @@ function updateToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
   const txt = btn.querySelector(".toggle-txt");
-  if (txt) txt.textContent = "Engage";
+  const pct = pendingBri != null ? Math.round((pendingBri / 254) * 100) : 100;
+  const name = pendingColor ? pendingColor.name : "";
+  if (txt) txt.textContent = pct + "% " + name + " Engage";
   btn.style.background = "";
   btn.style.color = "";
   btn.dataset.state = lightsOn === true ? "on" : lightsOn === false ? "off" : "unknown";
-  if (pendingColor) {                         // preview the staged color
+  if (pendingColor) {                         // show the selected color
     btn.style.background = pendingColor.css;
     btn.style.color = textColorFor(pendingColor.css);
   }
@@ -295,20 +305,18 @@ function bindLightsToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
   btn.addEventListener("click", () => {
-    const hasStaged = pendingColor || pendingBri != null;
-    if (lightsOn && !hasStaged) {
-      // already on and nothing staged -> turn the lights off
+    if (lightsOn && !dirty) {
+      // on, nothing newly selected -> turn off (resets selection to white/100)
       runAction("Kitchen Lights Off");
       resetLightControls();
       lightsOn = false;
       toast("The kitchen lights are off.");
     } else {
-      // enact the staged choices (turn on, or update in place)
+      // enact the current selection (turn on / update in place); keep selection
       const body = pendingColor ? Object.assign({}, pendingColor.body) : { on: true };
       if (pendingBri != null) body.bri = pendingBri;
       runHue(body);
-      pendingColor = null;
-      pendingBri = null;
+      dirty = false;
       lightsOn = true;
       toast("Engaged.");
     }
@@ -331,7 +339,8 @@ function bindLightTools() {
       b.addEventListener("click", () => {
         selectSwatch(b);
         setTrackColor(c.css);              // brightness bar takes the color
-        pendingColor = { body: c.body, css: c.css };   // always stage
+        pendingColor = { body: c.body, css: c.css, name: c.name };   // always stage
+        dirty = true;
         updateToggle();
         toast(c.name + " staged — press Engage.");
       });
@@ -346,6 +355,7 @@ function bindLightTools() {
       const pct = Number(slider.value);
       if (out) out.textContent = pct + "%";
       pendingBri = Math.max(1, Math.round((pct / 100) * 254));   // always stage
+      dirty = true;
       updateToggle();
     });
   }
@@ -500,5 +510,6 @@ document.addEventListener("DOMContentLoaded", () => {
   bindSoonRooms();
   bindLightsToggle();
   bindLightTools();
+  resetLightControls();     // default selection: white + 100%
   updateLightsStatus();
 });
