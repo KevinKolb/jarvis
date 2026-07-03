@@ -100,7 +100,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return res, (html.unescape(md.group(1)) if md else "")
         return None, None
 
-    def _play_favorite(self, name):
+    def _play_favorite(self, name, shuffle=False):
         res, meta = self._find_favorite(name)
         if not res:
             raise Exception("favorite not found: %s" % name)
@@ -121,19 +121,29 @@ class Handler(SimpleHTTPRequestHandler):
                 '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
                 '<CurrentURI>%s</CurrentURI><CurrentURIMetaData>%s</CurrentURIMetaData></u:SetAVTransportURI>'
                 % (esc(res), esc(meta)))
+        if res.startswith("x-rincon-cpcontainer"):
+            self._set_play_mode(shuffle)
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
 
-    def _play_apple(self, kind, cid, title):
-        """Play an Apple Music album/song/playlist by its catalog id (no favorite needed)."""
+    def _set_play_mode(self, shuffle):
+        self._sonos("AVTransport", "SetPlayMode",
+            '<u:SetPlayMode xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+            '<NewPlayMode>%s</NewPlayMode></u:SetPlayMode>' % ("SHUFFLE" if shuffle else "NORMAL"))
+
+    def _play_apple(self, kind, cid, title, shuffle=False):
+        """Play an Apple Music album/song/playlist by its id (no favorite needed)."""
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         title = title or "Apple Music"
         if kind == "album":
             res = "x-rincon-cpcontainer:1004206calbum%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
             item_id, cls = "1004206calbum%%3a%s" % cid, "object.container.album.musicAlbum.#AlbumView"
+        elif kind == "libraryplaylist":
+            res = "x-rincon-cpcontainer:1006206clibraryplaylist%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
+            item_id, cls = "1006206clibraryplaylist%%3a%s" % cid, "object.container.playlistContainer"
         elif kind == "playlist":
             res = "x-rincon-cpcontainer:1006206cplaylist%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
-            item_id, cls = "1006206cplaylist%%3a%s" % cid, "object.container.playlistContainer.#PlaylistView"
+            item_id, cls = "1006206cplaylist%%3a%s" % cid, "object.container.playlistContainer"
         else:  # song
             res = "x-sonos-http:song%%3a%s.mp4?sid=204&flags=8224&sn=%s" % (cid, SONOS_SN)
             item_id, cls = "10032020song%%3a%s" % cid, "object.item.audioItem.musicTrack"
@@ -155,6 +165,7 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "SetAVTransportURI",
             '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
             '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+        self._set_play_mode(shuffle)
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
 
@@ -373,8 +384,9 @@ class Handler(SimpleHTTPRequestHandler):
         # Play a Sonos favorite by name:  POST /sonos/favorite  {"name": "..."}
         if self.path == "/sonos/favorite":
             try:
-                name = json.loads(raw or b"{}").get("name", "")
-                self._play_favorite(name)
+                p = json.loads(raw or b"{}")
+                name = p.get("name", "")
+                self._play_favorite(name, bool(p.get("shuffle")))
                 self._json({"ok": True, "name": name})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
@@ -384,7 +396,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/sonos/apple":
             try:
                 p = json.loads(raw or b"{}")
-                self._play_apple(p.get("kind", "song"), str(p.get("id", "")), p.get("title", ""))
+                self._play_apple(p.get("kind", "song"), str(p.get("id", "")), p.get("title", ""), bool(p.get("shuffle")))
                 self._json({"ok": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)

@@ -156,12 +156,12 @@ const MUSIC = {
     { label: "Southern Nights", fav: "Southern Nights" },
     { label: "Vivid", fav: "Vivid" },
   ],
+  // Playlists shuffle by default.
   playlists: [
-    { label: "Juicy Playlist", fav: "A Juicy Playlist" },
-    { label: "Happy Rock", fav: "Happy Rock" },
-    { label: "Southern Nights", fav: "Southern Nights" },
-    { label: "Vivid", fav: "Vivid" },
-    { label: "Simple", fav: "Simple" },
+    { label: "Morning Alarm", shuffle: true, apple: { kind: "libraryplaylist", id: "p.b16GR55TARxgG", title: "Morning Alarm" } },
+    { label: "Juicy Playlist", shuffle: true, fav: "A Juicy Playlist" },
+    { label: "Happy Rock", shuffle: true, fav: "Happy Rock" },
+    { label: "Simple", shuffle: true, fav: "Simple" },
   ],
   podcasts: [
     { label: "Learn French", fav: "Learn French" },
@@ -204,9 +204,9 @@ function updateSonos() {
     })
     .catch(() => {});
 }
-function playFavorite(fav, label) {
+function playFavorite(fav, label, shuffle) {
   fetch("/sonos/favorite", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: fav }), keepalive: true }).catch(() => {});
+    body: JSON.stringify({ name: fav, shuffle: !!shuffle }), keepalive: true }).catch(() => {});
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
@@ -272,7 +272,9 @@ function renderMusic() {
         b.type = "button";
         b.className = "chan-btn";
         b.textContent = c.label;
-        b.addEventListener("click", () => c.apple ? playApple(c.apple, c.label) : playFavorite(c.fav, c.label));
+        b.addEventListener("click", () =>
+          c.apple ? playApple(Object.assign({ shuffle: !!c.shuffle }, c.apple), c.label)
+                  : playFavorite(c.fav, c.label, !!c.shuffle));
         host.appendChild(b);
       });
     });
