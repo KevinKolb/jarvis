@@ -106,6 +106,7 @@ function runHueProxy(hue) {
 const LIGHTS_GROUP = "82";   // kitchen Hue group
 let lightsOn = null;         // true / false / null (unknown)
 let pendingColor = null;     // { body, css } chosen while OFF, applied on next turn-on
+let pendingBri = null;       // brightness chosen while OFF, applied on next turn-on
 let selectedSwatchEl = null; // currently highlighted swatch
 
 function selectSwatch(el) {
@@ -210,12 +211,17 @@ function bindLightsToggle() {
   btn.addEventListener("click", () => {
     const turningOn = !lightsOn;                         // null -> turn ON
     if (turningOn) {
-      if (pendingColor) { runHue(pendingColor.body); pendingColor = null; }
+      const body = pendingColor ? Object.assign({}, pendingColor.body) : { on: true };
+      if (pendingBri != null) body.bri = pendingBri;    // apply staged brightness
+      if (pendingColor || pendingBri != null) runHue(body);
       else runAction("Kitchen Lights On");
+      pendingColor = null;
+      pendingBri = null;
       toast("The kitchen lights are on.");
     } else {
       runAction("Kitchen Lights Off");
       pendingColor = null;
+      pendingBri = null;
       selectSwatch(null);
       toast("The kitchen lights are off.");
     }
@@ -264,15 +270,17 @@ function bindLightTools() {
       const pct = Number(slider.value);
       if (out) out.textContent = pct + "%";
       const bri = Math.max(1, Math.round((pct / 100) * 254));
+      if (!lightsOn) {
+        pendingBri = bri;                    // lights off: stage for next turn-on
+        return;
+      }
       clearTimeout(t);                       // throttle while dragging
-      t = window.setTimeout(() => {
-        runHue({ on: true, bri: bri });
-        lightsOn = true;
-        updateToggle();
-      }, 150);
+      t = window.setTimeout(() => { runHue({ on: true, bri: bri }); }, 150);
     });
-    // On release, re-read the real state so everything stays in sync.
-    slider.addEventListener("change", () => window.setTimeout(updateLightsStatus, 500));
+    // On release (when on), re-read the real state so everything stays in sync.
+    slider.addEventListener("change", () => {
+      if (lightsOn) window.setTimeout(updateLightsStatus, 500);
+    });
   }
 }
 
