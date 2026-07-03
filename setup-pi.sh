@@ -30,7 +30,8 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now jarvis.service
+sudo systemctl enable jarvis.service
+sudo systemctl restart jarvis.service   # restart so code changes take effect
 
 IP="$(hostname -I | awk '{print $1}')"
 
