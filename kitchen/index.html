@@ -23,9 +23,11 @@
       Rooms
     </a>
 
+    <div class="conn-bar"><span id="conn-text">connecting…</span></div>
+
     <!-- Kitchen header -->
     <header class="card kitchen-head" id="kitchen-hero">
-      <div class="hero-status"><span id="conn-text">connecting…</span> | <span id="lights-line-text">Off</span> | <span id="np-line">Now playing —</span></div>
+      <div class="hero-status"><span id="lights-line-text">Off</span> | <span id="np-line">Now playing —</span></div>
       <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</h1>
     </header>
 
@@ -51,40 +53,7 @@
       </div>
     </section>
 
-    <!-- SiriusXM -->
-    <section class="section theme-music" aria-labelledby="sxm-label">
-      <p class="section-label" id="sxm-label">SiriusXM <span class="hint">· kitchen speakers</span></p>
-      <div class="list" id="channel-list"></div>
-    </section>
-
-    <!-- Podcasts -->
-    <section class="section theme-music" aria-labelledby="pod-label">
-      <p class="section-label" id="pod-label">Podcasts</p>
-      <div class="list" id="podcast-list"></div>
-    </section>
-
-    <!-- Now Playing -->
-    <section class="section theme-music" aria-labelledby="np-label">
-      <p class="section-label" id="np-label">Now Playing</p>
-      <div class="card now-playing">
-        <div class="np-body">
-          <div class="np-kicker">Kitchen speakers</div>
-          <div class="np-track" id="np-track">Nothing playing</div>
-        </div>
-        <div class="np-controls">
-          <button class="np-btn" type="button" data-shortcut="Kitchen-Volume-Down" data-toast="Lowering the volume." aria-label="Volume down">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M17 12h6"/></svg>
-          </button>
-          <button class="np-btn" type="button" data-shortcut="Kitchen-Volume-Up" data-toast="Raising the volume." aria-label="Volume up">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M20 9v6M17 12h6"/></svg>
-          </button>
-          <button class="np-btn np-stop" type="button" data-shortcut="Kitchen-Stop" data-toast="Stopping playback in the kitchen." data-stop="true" aria-label="Stop">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
-            Stop
-          </button>
-        </div>
-      </div>
-    </section>
+    <!-- Music (Sonos) — built next -->
 
     <!-- QR to this page -->
     <section class="card qr" aria-label="Kitchen page QR code">

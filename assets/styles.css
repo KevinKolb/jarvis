@@ -193,6 +193,17 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.08em;
   color: inherit;
 }
+.conn-bar {
+  margin: 0 0.35rem 0.6rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+#conn-text { color: var(--muted); }
+#conn-text[data-conn="online"] { color: var(--ink); }
+#conn-text[data-conn="offline"] { color: var(--muted); }
 .kitchen-title {
   display: flex;
   align-items: center;
