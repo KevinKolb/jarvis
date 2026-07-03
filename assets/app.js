@@ -24,6 +24,38 @@ const CONFIG = {
   podcasts: [
     { title: "Latest episodes", meta: "Your podcast queue", shortcut: "Kitchen-Podcast-Latest" },
   ],
+
+  /* ---- How controls fire ----------------------------------------------
+     mode "shortcut": tap opens the Shortcuts app and runs the named
+                      Shortcut (works for anything, but flashes the app).
+     mode "fetch":    tap fires a silent background request — NO app
+                      switch. Any action listed in `endpoints` below uses
+                      fetch; anything not listed falls back to a Shortcut.
+
+     Key each endpoint by the SAME name used in data-shortcut / the
+     `shortcut` field above. Then flip mode to "fetch".
+
+     NOTE on hosting: this page is served over https (github.io). Browsers
+     block https pages from calling plain-http LAN devices (mixed content),
+     so a bare Hue bridge at http://192.168… will be blocked here. Use an
+     https endpoint — e.g. a Home Assistant webhook (Nabu Casa / reverse
+     proxy) — or host this page over http on your LAN for Hue.
+
+     Home Assistant webhook example (https, no auth, fire-and-forget):
+       "Kitchen Lights On":  { url: "https://your-ha/api/webhook/kitchen_lights_on" },
+       "Kitchen Lights Off": { url: "https://your-ha/api/webhook/kitchen_lights_off" },
+
+     Hue local API example (only if this page is served over http):
+       "Kitchen Lights On":  { url: "http://<bridge-ip>/api/<user>/groups/1/action",
+                               method: "PUT", body: '{"on":true}' },
+  --------------------------------------------------------------------- */
+  control: {
+    mode: "shortcut",          // "shortcut" | "fetch"
+    endpoints: {
+      // "Kitchen Lights On":  { url: "", method: "POST", body: "" },
+      // "Kitchen Lights Off": { url: "", method: "POST", body: "" },
+    },
+  },
 };
 
 /* ---------- Icons ---------- */
@@ -45,13 +77,39 @@ function toast(message) {
   toastTimer = window.setTimeout(() => el.classList.remove("show"), 2600);
 }
 
-/* ---------- Run an iOS Shortcut ---------- */
+/* ---------- Run an iOS Shortcut (opens Shortcuts app) ---------- */
 function runShortcut(name) {
   if (!name) return;
   // Give the toast a beat to render before the app switch on iOS.
   window.setTimeout(() => {
     window.location.href = "shortcuts://run-shortcut?name=" + encodeURIComponent(name);
   }, 180);
+}
+
+/* ---------- Fire a silent background request (no app switch) ---------- */
+function runFetch(req) {
+  fetch(req.url, {
+    method: req.method || "POST",
+    headers: req.body ? { "Content-Type": "application/json" } : undefined,
+    body: req.body || undefined,
+    mode: "no-cors",     // fire-and-forget; response is opaque
+    keepalive: true,
+  }).catch(() => { /* ignore — request still leaves the device */ });
+}
+
+/* ---------- Decide how an action runs ---------- */
+function runAction(name, el) {
+  // Element-level override wins: data-fetch / data-method / data-body
+  if (el && el.dataset && el.dataset.fetch) {
+    runFetch({ url: el.dataset.fetch, method: el.dataset.method, body: el.dataset.body });
+    return;
+  }
+  const ep = CONFIG.control.endpoints[name];
+  if (CONFIG.control.mode === "fetch" && ep && ep.url) {
+    runFetch(ep);
+    return;
+  }
+  runShortcut(name);
 }
 
 /* ---------- Greeting by time of day ---------- */
@@ -92,7 +150,7 @@ function makeRow({ icon, title, meta, shortcut, nowPlaying }) {
       markPlaying(btn);
     }
     toast('Very good. Playing "' + title + '" in the kitchen.');
-    runShortcut(shortcut);
+    runAction(shortcut);
   });
   return btn;
 }
@@ -154,7 +212,7 @@ function bindShortcutButtons() {
         markPlaying(null);
       }
       if (btn.dataset.toast) toast(btn.dataset.toast);
-      runShortcut(btn.dataset.shortcut);
+      runAction(btn.dataset.shortcut, btn);
     });
   });
 }
