@@ -354,32 +354,32 @@ button { font: inherit; color: inherit; }
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 26px;
+  height: 46px;                 /* match color blocks */
   background: transparent;
   cursor: pointer;
 }
 .slider::-webkit-slider-runnable-track {
-  height: 22px;
+  height: 40px;
   background: linear-gradient(to right, #000000, var(--track-color, var(--lights)));
   border: 3px solid var(--edge);
 }
 .slider::-moz-range-track {
-  height: 22px;
+  height: 40px;
   background: linear-gradient(to right, #000000, var(--track-color, var(--lights)));
   border: 3px solid var(--edge);
 }
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 30px;
-  margin-top: -7px;
+  width: 18px;
+  height: 46px;
+  margin-top: -3px;
   background: var(--ink);
   border: 3px solid var(--edge);
 }
 .slider::-moz-range-thumb {
-  width: 14px;
-  height: 28px;
+  width: 16px;
+  height: 46px;
   border-radius: 0;
   background: var(--ink);
   border: 3px solid var(--edge);
@@ -418,7 +418,7 @@ button { font: inherit; color: inherit; }
 .swatch {
   -webkit-appearance: none;
   appearance: none;
-  aspect-ratio: 1 / 1;
+  height: 46px;
   border: 3px solid var(--edge);
   border-radius: 0;
   box-shadow: var(--sh-sm);
@@ -428,6 +428,38 @@ button { font: inherit; color: inherit; }
 .swatch:hover { transform: translate(-2px, -2px); box-shadow: var(--sh); }
 .swatch:active { transform: translate(2px, 2px); box-shadow: none; }
 .swatch.sel { outline: 4px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- Music channel buttons (Radio / Jukebox / Podcasts) ---------- */
+.chan-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.chan-row:last-child { margin-bottom: 0; }
+.chan-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0.65rem 0.9rem;
+  border: 3px solid var(--edge);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 90ms ease, box-shadow 90ms ease;
+}
+.chan-btn:hover { transform: translate(-2px, -2px); box-shadow: var(--sh); }
+.chan-btn:active { transform: translate(2px, 2px); box-shadow: none; background: var(--music); color: #fff; }
+
+/* ---------- Footer (Rooms) ---------- */
+.page-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.6rem;
+}
+.page-footer .backlink { margin: 0; }
 
 /* ---------- Lists (SiriusXM / Podcasts) ---------- */
 .list {

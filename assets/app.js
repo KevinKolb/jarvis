@@ -135,51 +135,106 @@ const COLORS = [
   { name: "Purple", css: "#8e24aa", body: { on: true, hue: 54000, sat: 254 } },
 ];
 
-// Kitchen Sonos volume (stereo pair group volume, via the Pi).
-function showVol(v) {
+/* ---------- Kitchen Sonos (stereo pair, via the Pi) ---------- */
+// Channel buttons. `fav` must match the Sonos favorite title exactly.
+const MUSIC = {
+  radio: [
+    { label: "John Mayer", fav: "CH 14 - Life with John Mayer" },
+    { label: "Yacht Rock", fav: "CH 17 - Yacht Rock Radio" },
+    { label: "The Bridge", fav: "CH 27 - The Bridge" },
+    { label: "Chill", fav: "CH 55 - SiriusXM Chill" },
+    { label: "Classic Vinyl", fav: "CH 26 - Classic Vinyl" },
+    { label: "WWOZ", fav: "WWOZ" },
+  ],
+  jukebox: [
+    { label: "Juicy Playlist", fav: "A Juicy Playlist" },
+    { label: "Happy Rock", fav: "Happy Rock" },
+    { label: "Southern Nights", fav: "Southern Nights" },
+    { label: "Vivid", fav: "Vivid" },
+    { label: "Simple", fav: "Simple" },
+  ],
+  podcasts: [
+    { label: "Learn French", fav: "Learn French" },
+  ],
+};
+
+let sonosVol = 0, sonosMuted = false, npTrack = "", npPlaying = false;
+
+function renderVol() {
   const out = document.getElementById("vol-val");
+  if (out) out.textContent = sonosVol + "%";
+  const s = document.getElementById("volume");
+  if (s && sonosVol >= 1 && sonosVol <= 99) s.value = sonosVol;
+  const bm = document.getElementById("vol-mute");
+  if (bm) bm.textContent = sonosMuted ? "Unmute" : "Mute";
+}
+function renderNP() {
   const np = document.getElementById("np-line");
-  if (out) out.textContent = v + "%";
-  if (np) np.textContent = "Now playing " + v + "%";
+  if (!np) return;
+  const vp = sonosVol + "%";
+  if (npPlaying && npTrack) np.textContent = "Now playing " + npTrack + " · " + vp;
+  else if (npPlaying) np.textContent = "Now playing · " + vp;
+  else np.textContent = "Nothing playing · " + vp;
 }
 function setSonosVolume(level) {
-  fetch("/sonos/volume", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ level: level }),
-    keepalive: true,
-  }).catch(() => {});
+  fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ level: level }), keepalive: true }).catch(() => {});
 }
 function updateSonos() {
-  fetch("/sonos/volume", { cache: "no-store" })
+  fetch("/sonos/state", { cache: "no-store" })
     .then((r) => r.json())
     .then((d) => {
-      if (!d || typeof d.volume !== "number") return;
-      showVol(d.volume);
-      const s = document.getElementById("volume");
-      if (s && d.volume >= 1 && d.volume <= 99) s.value = d.volume;
+      if (!d || d.error) return;
+      if (typeof d.volume === "number") sonosVol = d.volume;
+      sonosMuted = !!d.mute;
+      npPlaying = !!d.playing;
+      npTrack = d.track || "";
+      renderVol();
+      renderNP();
     })
-    .catch(() => {
-      const np = document.getElementById("np-line");
-      if (np) np.textContent = "Now playing —";
+    .catch(() => {});
+}
+function playFavorite(fav, label) {
+  fetch("/sonos/favorite", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: fav }), keepalive: true }).catch(() => {});
+  toast("Playing " + label + ".");
+  window.setTimeout(updateSonos, 1500);
+}
+function renderMusic() {
+  [["row-radio", MUSIC.radio], ["row-jukebox", MUSIC.jukebox], ["row-podcasts", MUSIC.podcasts]]
+    .forEach(([id, list]) => {
+      const host = document.getElementById(id);
+      if (!host) return;
+      list.forEach((c) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "chan-btn";
+        b.textContent = c.label;
+        b.addEventListener("click", () => playFavorite(c.fav, c.label));
+        host.appendChild(b);
+      });
     });
 }
 function bindVolume() {
   const s = document.getElementById("volume");
-  const v0 = document.getElementById("vol-0");
-  const v100 = document.getElementById("vol-100");
+  const bmute = document.getElementById("vol-mute");
+  const b100 = document.getElementById("vol-100");
   let t;
   if (s) s.addEventListener("input", () => {
-    const v = Number(s.value);              // 1..99
-    showVol(v);
-    clearTimeout(t);                        // throttle while dragging
-    t = window.setTimeout(() => setSonosVolume(v), 120);
+    sonosVol = Number(s.value);             // 1..99
+    renderVol(); renderNP();
+    clearTimeout(t);
+    t = window.setTimeout(() => setSonosVolume(sonosVol), 120);
   });
-  if (v0) v0.addEventListener("click", () => { showVol(0); setSonosVolume(0); });
-  if (v100) v100.addEventListener("click", () => {
-    if (s) s.value = 99;
-    showVol(100);
-    setSonosVolume(100);
+  if (b100) b100.addEventListener("click", () => {
+    sonosVol = 100; if (s) s.value = 99;
+    renderVol(); renderNP(); setSonosVolume(100);
+  });
+  if (bmute) bmute.addEventListener("click", () => {
+    sonosMuted = !sonosMuted;
+    renderVol(); renderNP();
+    fetch("/sonos/mute", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mute: sonosMuted }), keepalive: true }).catch(() => {});
   });
 }
 
@@ -617,6 +672,8 @@ document.addEventListener("DOMContentLoaded", () => {
   bindLightTools();
   resetLightControls();     // default selection: white + 100%
   bindVolume();
+  renderMusic();
   updateLightsStatus();
   updateSonos();
+  window.setInterval(updateSonos, 10000);   // keep now-playing/volume fresh
 });

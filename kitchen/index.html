@@ -18,11 +18,6 @@
 </head>
 <body>
   <main class="page" data-room="kitchen">
-    <a class="backlink" href="../">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-      Rooms
-    </a>
-
     <div class="conn-bar"><span id="conn-text">connecting…</span></div>
 
     <!-- Kitchen header -->
@@ -59,12 +54,22 @@
         <div class="tool-row">
           <span class="tool-label">Volume <span id="vol-val">—</span></span>
           <div class="bri-row">
-            <button class="bri-end bri-off" id="vol-0" type="button" aria-label="Mute (0%)">0%</button>
+            <button class="bri-end bri-off" id="vol-mute" type="button" aria-label="Mute toggle">Mute</button>
             <input type="range" id="volume" class="slider vol-slider" min="1" max="99" value="24" aria-label="Volume">
             <button class="bri-end vol-max" id="vol-100" type="button" aria-label="Max (100%)">100%</button>
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- Music channels (Sonos favorites) -->
+    <section class="section theme-music" aria-label="Music">
+      <p class="section-label">Radio</p>
+      <div class="chan-row" id="row-radio"></div>
+      <p class="section-label">Jukebox</p>
+      <div class="chan-row" id="row-jukebox"></div>
+      <p class="section-label">Podcasts</p>
+      <div class="chan-row" id="row-podcasts"></div>
     </section>
 
     <!-- QR to this page -->
@@ -83,6 +88,13 @@
         </button>
       </div>
     </section>
+
+    <footer class="page-footer">
+      <a class="backlink" href="../">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        Rooms
+      </a>
+    </footer>
   </main>
 
   <!-- Print-only sheet: SCAN TO CONTROL KITCHEN + QR + url -->
