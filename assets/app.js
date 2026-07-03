@@ -106,6 +106,22 @@ function runHueProxy(hue) {
 const LIGHTS_GROUP = "82";   // kitchen Hue group
 let lightsOn = null;         // true / false / null (unknown)
 
+// Send a state change to the kitchen group via the Pi relay.
+function runHue(body) {
+  runHueProxy({ path: "/groups/" + LIGHTS_GROUP + "/action", body: body });
+}
+
+// ROYGBIV — `hue` is Hue's 0–65535 hue wheel; `css` is the swatch color.
+const COLORS = [
+  { name: "Red",    css: "#e53935", hue: 0 },
+  { name: "Orange", css: "#fb8c00", hue: 4500 },
+  { name: "Yellow", css: "#fdd835", hue: 10500 },
+  { name: "Green",  css: "#43a047", hue: 25500 },
+  { name: "Blue",   css: "#1e88e5", hue: 43690 },
+  { name: "Indigo", css: "#3949ab", hue: 47000 },
+  { name: "Violet", css: "#8e24aa", hue: 54000 },
+];
+
 function updateLightsStatus() {
   const el = document.getElementById("lights-status");
   fetch("/hue/groups/" + LIGHTS_GROUP, { cache: "no-store" })
@@ -115,6 +131,14 @@ function updateLightsStatus() {
       const on = !!state.any_on;
       const bri = g && g.action ? g.action.bri : null;
       lightsOn = on;
+      // Keep the brightness slider in sync with the real value.
+      const slider = document.getElementById("brightness");
+      const briOut = document.getElementById("bri-val");
+      if (typeof bri === "number" && slider) {
+        const pct = Math.round((bri / 254) * 100);
+        slider.value = pct;
+        if (briOut) briOut.textContent = pct + "%";
+      }
       if (el) {
         el.dataset.state = on ? "on" : "off";
         const txt = el.querySelector(".txt");
@@ -158,6 +182,48 @@ function bindLightsToggle() {
     updateToggle();
     window.setTimeout(updateLightsStatus, 500);          // confirm from bridge
   });
+}
+
+/* ---------- Brightness slider + ROYGBIV color swatches ---------- */
+function bindLightTools() {
+  const swatches = document.getElementById("swatches");
+  if (swatches) {
+    COLORS.forEach((c) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "swatch";
+      b.style.background = c.css;
+      b.title = c.name;
+      b.setAttribute("aria-label", c.name);
+      b.addEventListener("click", () => {
+        runHue({ on: true, hue: c.hue, sat: 254 });
+        toast("Kitchen lights set to " + c.name.toLowerCase() + ".");
+        lightsOn = true;
+        updateToggle();
+        window.setTimeout(updateLightsStatus, 500);
+      });
+      swatches.appendChild(b);
+    });
+  }
+
+  const slider = document.getElementById("brightness");
+  const out = document.getElementById("bri-val");
+  if (slider) {
+    let t;
+    slider.addEventListener("input", () => {
+      const pct = Number(slider.value);
+      if (out) out.textContent = pct + "%";
+      const bri = Math.max(1, Math.round((pct / 100) * 254));
+      clearTimeout(t);                       // throttle while dragging
+      t = window.setTimeout(() => {
+        runHue({ on: true, bri: bri });
+        lightsOn = true;
+        updateToggle();
+      }, 150);
+    });
+    // On release, re-read the real state so everything stays in sync.
+    slider.addEventListener("change", () => window.setTimeout(updateLightsStatus, 500));
+  }
 }
 
 /* ---------- Decide how an action runs ---------- */
@@ -308,5 +374,6 @@ document.addEventListener("DOMContentLoaded", () => {
   bindPrint();
   bindSoonRooms();
   bindLightsToggle();
+  bindLightTools();
   updateLightsStatus();
 });

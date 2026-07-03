@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#f4f1e6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#14140f" media="(prefers-color-scheme: dark)">
   <title>Kitchen · JARVIS</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -43,6 +44,17 @@
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
         <span class="toggle-txt">Toggle Lights</span>
       </button>
+
+      <div class="light-tools">
+        <label class="tool-row" for="brightness">
+          <span class="tool-label">Brightness <span id="bri-val">100%</span></span>
+          <input type="range" id="brightness" class="slider" min="1" max="100" value="100" aria-label="Brightness">
+        </label>
+        <div class="tool-row">
+          <span class="tool-label">Color</span>
+          <div class="swatches" id="swatches" role="group" aria-label="Light color"></div>
+        </div>
+      </div>
     </section>
 
     <!-- SiriusXM -->
