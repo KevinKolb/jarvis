@@ -24,6 +24,8 @@ PORT      = 80
 # ---- Kitchen Sonos (stereo pair; .41 = the pair's coordinator) ----------
 SONOS_IP   = "192.168.86.41"
 SONOS_UUID = "RINCON_7828CAE1ACD801400"   # coordinator (for queue playback)
+SONOS_SN    = "9"                          # Apple Music account serial on this system
+SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
 SONOS_ROOMS = [                            # other rooms you can share kitchen audio to
     ("Living Room", "192.168.86.34"),
     ("Bedroom",     "192.168.86.156"),
@@ -122,6 +124,40 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
 
+    def _play_apple(self, kind, cid, title):
+        """Play an Apple Music album/song/playlist by its catalog id (no favorite needed)."""
+        esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        title = title or "Apple Music"
+        if kind == "album":
+            res = "x-rincon-cpcontainer:1004206calbum%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
+            item_id, cls = "1004206calbum%%3a%s" % cid, "object.container.album.musicAlbum.#AlbumView"
+        elif kind == "playlist":
+            res = "x-rincon-cpcontainer:1006206cplaylist%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
+            item_id, cls = "1006206cplaylist%%3a%s" % cid, "object.container.playlistContainer.#PlaylistView"
+        else:  # song
+            res = "x-sonos-http:song%%3a%s.mp4?sid=204&flags=8224&sn=%s" % (cid, SONOS_SN)
+            item_id, cls = "10032020song%%3a%s" % cid, "object.item.audioItem.musicTrack"
+        meta = ('<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
+                'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
+                'xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" '
+                'xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">'
+                '<item id="%s" parentID="0" restricted="true"><dc:title>%s</dc:title>'
+                '<upnp:class>%s</upnp:class>'
+                '<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">%s</desc>'
+                '</item></DIDL-Lite>') % (item_id, esc(title), cls, SONOS_CDUDN)
+        self._sonos("AVTransport", "RemoveAllTracksFromQueue",
+            '<u:RemoveAllTracksFromQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:RemoveAllTracksFromQueue>')
+        self._sonos("AVTransport", "AddURIToQueue",
+            '<u:AddURIToQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+            '<EnqueuedURI>%s</EnqueuedURI><EnqueuedURIMetaData>%s</EnqueuedURIMetaData>'
+            '<DesiredFirstTrackNumberEnqueued>0</DesiredFirstTrackNumberEnqueued><EnqueueAsNext>0</EnqueueAsNext></u:AddURIToQueue>'
+            % (esc(res), esc(meta)))
+        self._sonos("AVTransport", "SetAVTransportURI",
+            '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+            '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+        self._sonos("AVTransport", "Play",
+            '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+
     def _zone_groups(self):
         """Return [(coordinator_uuid, [member_ips])] from the Sonos topology."""
         env = ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
@@ -149,6 +185,22 @@ class Handler(SimpleHTTPRequestHandler):
                      "SOAPAction": '"urn:schemas-upnp-org:service:AVTransport:1#%s"' % action})
         with urllib.request.urlopen(req, timeout=6) as r:
             return r.read()
+
+    def _rc_ip(self, ip, action, inner):
+        """RenderingControl SOAP to a specific speaker IP (per-speaker volume)."""
+        env = ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+               's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>%s</s:Body></s:Envelope>') % inner
+        req = urllib.request.Request("http://%s:1400/MediaRenderer/RenderingControl/Control" % ip, data=env.encode(),
+            headers={"Content-Type": 'text/xml; charset="utf-8"',
+                     "SOAPAction": '"urn:schemas-upnp-org:service:RenderingControl:1#%s"' % action})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            return r.read()
+
+    def _kitchen_volume(self):
+        xml = self._sonos("GroupRenderingControl", "GetGroupVolume",
+            '<u:GetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1"><InstanceID>0</InstanceID></u:GetGroupVolume>')
+        m = re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", xml)
+        return int(m.group(1)) if m else 30
 
     def _json(self, obj, code=200):
         self.send_response(code)
@@ -292,9 +344,24 @@ class Handler(SimpleHTTPRequestHandler):
                 if not ip:
                     raise Exception("unknown room: %s" % room)
                 if join:
+                    # speakers currently in this room (before it joins the kitchen)
+                    room_ips = [ip]
+                    for coord, ips in self._zone_groups():
+                        if ip in ips:
+                            room_ips = ips
+                            break
                     self._avt_ip(ip, "SetAVTransportURI",
                         '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
                         '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+                    # pop the added room to the kitchen volume (then group volume keeps them together)
+                    kvol = self._kitchen_volume()
+                    for rip in room_ips:
+                        try:
+                            self._rc_ip(rip, "SetVolume",
+                                '<u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                                '<Channel>Master</Channel><DesiredVolume>%d</DesiredVolume></u:SetVolume>' % kvol)
+                        except Exception:
+                            pass
                 else:
                     self._avt_ip(ip, "BecomeCoordinatorOfStandaloneGroup",
                         '<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:BecomeCoordinatorOfStandaloneGroup>')
@@ -309,6 +376,16 @@ class Handler(SimpleHTTPRequestHandler):
                 name = json.loads(raw or b"{}").get("name", "")
                 self._play_favorite(name)
                 self._json({"ok": True, "name": name})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Play Apple Music by id:  POST /sonos/apple  {"kind","id","title"}
+        if self.path == "/sonos/apple":
+            try:
+                p = json.loads(raw or b"{}")
+                self._play_apple(p.get("kind", "song"), str(p.get("id", "")), p.get("title", ""))
+                self._json({"ok": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return

@@ -149,13 +149,12 @@ const MUSIC = {
   ],
   jukebox: [
     { label: "Foot of Canal St", fav: "Foot of Canal Street" },
+    { label: "Sledgehammer", apple: { kind: "song", id: "987872731", title: "Sledgehammer" } },
   ],
   albums: [
-    { label: "Juicy Playlist", fav: "A Juicy Playlist" },
-    { label: "Happy Rock", fav: "Happy Rock" },
+    { label: "Rubber Soul", apple: { kind: "album", id: "1441164359", title: "Rubber Soul" } },
     { label: "Southern Nights", fav: "Southern Nights" },
     { label: "Vivid", fav: "Vivid" },
-    { label: "Simple", fav: "Simple" },
   ],
   playlists: [
     { label: "Juicy Playlist", fav: "A Juicy Playlist" },
@@ -211,14 +210,39 @@ function playFavorite(fav, label) {
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
+function playApple(apple, label) {   // apple = {kind, id, title}
+  fetch("/sonos/apple", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(apple), keepalive: true }).catch(() => {});
+  toast("Playing " + label + ".");
+  window.setTimeout(updateSonos, 1500);
+}
 function renderShare() {
   const host = document.getElementById("row-share");
   if (!host) return;
+  function setRoom(btn, name, join) {
+    btn.classList.toggle("on", join);
+    fetch("/sonos/group", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: name, join: join }), keepalive: true }).catch(() => {});
+  }
   fetch("/sonos/rooms", { cache: "no-store" })
     .then((r) => r.json())
     .then((d) => {
       if (!d || !d.rooms) return;
       host.innerHTML = "";
+      const roomBtns = [];
+      const syncAll = () =>
+        all.classList.toggle("on", roomBtns.length > 0 && roomBtns.every((x) => x.btn.classList.contains("on")));
+      const all = document.createElement("button");
+      all.type = "button";
+      all.className = "chan-btn share-btn share-all";
+      all.textContent = "All";
+      all.addEventListener("click", () => {
+        const join = roomBtns.some((x) => !x.btn.classList.contains("on"));   // any off -> turn all on
+        roomBtns.forEach((x) => setRoom(x.btn, x.name, join));
+        all.classList.toggle("on", join);
+        toast(join ? "Sharing to all rooms." : "Stopped sharing to all rooms.");
+      });
+      host.appendChild(all);
       d.rooms.forEach((rm) => {
         const b = document.createElement("button");
         b.type = "button";
@@ -227,13 +251,14 @@ function renderShare() {
         if (rm.grouped) b.classList.add("on");
         b.addEventListener("click", () => {
           const join = !b.classList.contains("on");
-          b.classList.toggle("on", join);
-          fetch("/sonos/group", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ room: rm.name, join: join }), keepalive: true }).catch(() => {});
+          setRoom(b, rm.name, join);
+          syncAll();
           toast(join ? "Sharing kitchen audio to " + rm.name + "." : "Stopped sharing to " + rm.name + ".");
         });
+        roomBtns.push({ btn: b, name: rm.name });
         host.appendChild(b);
       });
+      syncAll();
     })
     .catch(() => {});
 }
@@ -247,7 +272,7 @@ function renderMusic() {
         b.type = "button";
         b.className = "chan-btn";
         b.textContent = c.label;
-        b.addEventListener("click", () => playFavorite(c.fav, c.label));
+        b.addEventListener("click", () => c.apple ? playApple(c.apple, c.label) : playFavorite(c.fav, c.label));
         host.appendChild(b);
       });
     });
