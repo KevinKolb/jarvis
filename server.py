@@ -27,6 +27,11 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    # Never let browsers cache the app, so phones always get the latest code.
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store, must-revalidate")
+        super().end_headers()
+
     def _bridge(self, method, bridge_path, body=None):
         """Forward a request to the Hue bridge and return its raw bytes."""
         url = "http://{}/api/{}{}".format(BRIDGE_IP, HUE_USER, bridge_path)
