@@ -104,6 +104,7 @@ function runHueProxy(hue) {
 
 /* ---------- Read + show current light status ---------- */
 const LIGHTS_GROUP = "82";   // kitchen Hue group
+const LIGHTS_SAMPLE = "22";  // a representative bulb in that group (true color)
 let lightsOn = null;         // true / false / null (unknown)
 let pendingColor = null;     // { body, css } chosen while OFF, applied on next turn-on
 let pendingBri = null;       // brightness chosen while OFF, applied on next turn-on
@@ -163,15 +164,30 @@ function hslToRgb(h, s, l) {
   }
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
-function lightRGB(action) {
-  if (!action) return [204, 204, 204];
-  if (action.colormode === "ct" || action.sat == null || action.sat < 20) {
-    const ct = action.ct || 300;                 // white: warm/cool by color temp
+// Philips xy (CIE) -> sRGB, for lights in "xy" color mode.
+function xyToRgb(x, y) {
+  if (!y) y = 0.0001;
+  const Y = 1, X = (Y / y) * x, Z = (Y / y) * (1 - x - y);
+  let r = X * 1.656492 - Y * 0.354851 - Z * 0.255038;
+  let g = -X * 0.707196 + Y * 1.655397 + Z * 0.036152;
+  let b = X * 0.051713 - Y * 0.121364 + Z * 1.011530;
+  const gam = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+  r = gam(r); g = gam(g); b = gam(b);
+  const m = Math.max(r, g, b);
+  if (m > 1) { r /= m; g /= m; b /= m; }
+  const cl = (c) => Math.round(Math.max(0, Math.min(1, c)) * 255);
+  return [cl(r), cl(g), cl(b)];
+}
+function lightRGB(a) {
+  if (!a) return [204, 204, 204];
+  if (a.colormode === "xy" && Array.isArray(a.xy)) return xyToRgb(a.xy[0], a.xy[1]);
+  if (a.colormode === "ct" || a.sat == null || a.sat < 20) {
+    const ct = a.ct || 300;                      // white: warm/cool by color temp
     const f = Math.max(0, Math.min(1, (ct - 153) / (500 - 153)));
-    const mix = (a, b) => Math.round(a + (b - a) * f);
+    const mix = (p, q) => Math.round(p + (q - p) * f);
     return [mix(219, 255), mix(233, 214), mix(255, 160)];
   }
-  return hslToRgb((action.hue || 0) / 65535, (action.sat || 0) / 254, 0.52);
+  return hslToRgb((a.hue || 0) / 65535, (a.sat || 0) / 254, 0.52);
 }
 function textForRgb(rgb) {
   const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
@@ -192,18 +208,23 @@ function paintHero(action, on) {
 }
 
 function updateLightsStatus() {
-  fetch("/hue/groups/" + LIGHTS_GROUP, { cache: "no-store" })
-    .then((r) => r.json())
-    .then((g) => {
+  Promise.all([
+    fetch("/hue/groups/" + LIGHTS_GROUP, { cache: "no-store" }).then((r) => r.json()),
+    fetch("/hue/lights/" + LIGHTS_SAMPLE, { cache: "no-store" }).then((r) => r.json()),
+  ])
+    .then(([grp, light]) => {
       setConn(true);
-      const state = (g && g.state) || {};
-      const on = !!state.any_on;
-      const bri = g && g.action ? g.action.bri : null;
+      const gstate = (grp && grp.state) || {};
+      const lstate = (light && light.state) || {};
+      const on = !!gstate.any_on;
+      const bri = typeof lstate.bri === "number"
+        ? lstate.bri
+        : (grp && grp.action ? grp.action.bri : null);
       lightsOn = on;
-      // Keep the brightness slider in sync with the real value.
+      // Keep the brightness slider in sync with the real value (while on).
       const slider = document.getElementById("brightness");
       const briOut = document.getElementById("bri-val");
-      if (on && typeof bri === "number" && slider) {   // only sync while on
+      if (on && typeof bri === "number" && slider) {
         const pct = Math.round((bri / 254) * 100);
         slider.value = pct;
         if (briOut) briOut.textContent = pct + "%";
@@ -211,18 +232,18 @@ function updateLightsStatus() {
       const text = document.getElementById("lights-line-text");
       if (on) {
         const pct = typeof bri === "number" ? Math.round((bri / 254) * 100) : null;
-        if (text) text.textContent = "On" + (pct != null ? " " + pct + "%" : "");
+        if (text) text.textContent = "Lights on" + (pct != null ? " " + pct + "%" : "");
       } else if (text) {
-        text.textContent = "Off";
+        text.textContent = "Lights off";
       }
-      paintHero(on ? g.action : null, on);
+      paintHero(on ? lstate : null, on);   // real bulb color, pure hue (bri ignored)
       updateToggle();
     })
     .catch(() => {
       setConn(false);
       lightsOn = null;
       const text = document.getElementById("lights-line-text");
-      if (text) text.textContent = "—";
+      if (text) text.textContent = "Lights —";
       paintHero(null, false);
       updateToggle();
     });
