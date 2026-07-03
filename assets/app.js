@@ -153,6 +153,13 @@ const MUSIC = {
     { label: "Vivid", fav: "Vivid" },
     { label: "Simple", fav: "Simple" },
   ],
+  albums: [
+    { label: "Juicy Playlist", fav: "A Juicy Playlist" },
+    { label: "Happy Rock", fav: "Happy Rock" },
+    { label: "Southern Nights", fav: "Southern Nights" },
+    { label: "Vivid", fav: "Vivid" },
+    { label: "Simple", fav: "Simple" },
+  ],
   podcasts: [
     { label: "Learn French", fav: "Learn French" },
   ],
@@ -227,7 +234,7 @@ function renderShare() {
     .catch(() => {});
 }
 function renderMusic() {
-  [["row-radio", MUSIC.radio], ["row-jukebox", MUSIC.jukebox], ["row-podcasts", MUSIC.podcasts]]
+  [["row-radio", MUSIC.radio], ["row-jukebox", MUSIC.jukebox], ["row-albums", MUSIC.albums], ["row-podcasts", MUSIC.podcasts]]
     .forEach(([id, list]) => {
       const host = document.getElementById(id);
       if (!host) return;
