@@ -25,14 +25,15 @@
     <header class="card kitchen-head">
       <span class="kitchen-conn"><span class="status-dot" id="conn-dot"></span><span id="conn-text">connecting…</span></span>
       <h1 class="kitchen-title">Kitchen</h1>
+      <div class="hero-lights">
+        <span class="hero-lights-sq" id="lights-square"></span>
+        <span id="lights-line-text">Lights off</span>
+      </div>
     </header>
 
     <!-- Lights -->
     <section class="section theme-lights" aria-labelledby="lights-label">
       <p class="section-label" id="lights-label">Lights</p>
-      <div class="lights-status" id="lights-status" data-state="unknown">
-        <span class="dot"></span><span class="txt">Checking lights…</span>
-      </div>
       <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle kitchen lights">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
         <span class="toggle-txt">Toggle Lights</span>

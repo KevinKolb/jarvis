@@ -202,6 +202,24 @@ button { font: inherit; color: inherit; }
   letter-spacing: -0.02em;
   text-transform: uppercase;
 }
+.hero-lights {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.hero-lights-sq {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border: 3px solid var(--edge);
+  background: #363636;
+}
 
 /* ---------- Sections ---------- */
 .section { margin-bottom: 1.5rem; }

@@ -132,8 +132,21 @@ function setConn(online) {
   if (txt) txt.textContent = online ? "online" : "offline";
 }
 
+// Approximate the group's current light color as a CSS color for the square.
+function hueColor(action) {
+  if (!action) return "#cccccc";
+  if (action.colormode === "ct" || action.sat == null || action.sat < 20) {
+    const ct = action.ct || 300;                 // white: warm/cool by color temp
+    const f = Math.max(0, Math.min(1, (ct - 153) / (500 - 153)));
+    const mix = (a, b) => Math.round(a + (b - a) * f);
+    return "rgb(" + mix(219, 255) + "," + mix(233, 214) + "," + mix(255, 160) + ")";
+  }
+  const h = ((action.hue || 0) / 65535) * 360;   // colored: hue + saturation
+  const s = ((action.sat || 0) / 254) * 100;
+  return "hsl(" + h.toFixed(0) + "," + s.toFixed(0) + "%,52%)";
+}
+
 function updateLightsStatus() {
-  const el = document.getElementById("lights-status");
   fetch("/hue/groups/" + LIGHTS_GROUP, { cache: "no-store" })
     .then((r) => r.json())
     .then((g) => {
@@ -150,26 +163,25 @@ function updateLightsStatus() {
         slider.value = pct;
         if (briOut) briOut.textContent = pct + "%";
       }
-      if (el) {
-        el.dataset.state = on ? "on" : "off";
-        const txt = el.querySelector(".txt");
-        if (!on) {
-          txt.textContent = "Lights are OFF";
-        } else {
-          let label = state.all_on ? "Lights are ON" : "Some lights ON";
-          if (typeof bri === "number") label += " · " + Math.round((bri / 254) * 100) + "%";
-          txt.textContent = label;
-        }
+      const square = document.getElementById("lights-square");
+      const text = document.getElementById("lights-line-text");
+      if (on) {
+        const pct = typeof bri === "number" ? Math.round((bri / 254) * 100) : null;
+        if (text) text.textContent = "Lights on" + (pct != null ? " " + pct + "%" : "");
+        if (square) square.style.background = hueColor(g.action);
+      } else {
+        if (text) text.textContent = "Lights off";
+        if (square) square.style.background = "#363636";
       }
       updateToggle();
     })
     .catch(() => {
       setConn(false);
       lightsOn = null;
-      if (el) {
-        el.dataset.state = "unknown";
-        el.querySelector(".txt").textContent = "Light status unavailable";
-      }
+      const text = document.getElementById("lights-line-text");
+      const square = document.getElementById("lights-square");
+      if (text) text.textContent = "Lights —";
+      if (square) square.style.background = "#363636";
       updateToggle();
     });
 }
