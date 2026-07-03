@@ -284,16 +284,10 @@ function updateToggle() {
   if (txt) txt.textContent = "Engage";
   btn.style.background = "";
   btn.style.color = "";
-  if (lightsOn === true) {
-    btn.dataset.state = "on";
-  } else if (lightsOn === false) {
-    btn.dataset.state = "off";
-    if (pendingColor) {                       // preview the staged color
-      btn.style.background = pendingColor.css;
-      btn.style.color = textColorFor(pendingColor.css);
-    }
-  } else {
-    btn.dataset.state = "unknown";
+  btn.dataset.state = lightsOn === true ? "on" : lightsOn === false ? "off" : "unknown";
+  if (pendingColor) {                         // preview the staged color
+    btn.style.background = pendingColor.css;
+    btn.style.color = textColorFor(pendingColor.css);
   }
 }
 
@@ -301,21 +295,23 @@ function bindLightsToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
   btn.addEventListener("click", () => {
-    const turningOn = !lightsOn;                         // null -> turn ON
-    if (turningOn) {
-      const body = pendingColor ? Object.assign({}, pendingColor.body) : { on: true };
-      if (pendingBri != null) body.bri = pendingBri;    // apply staged brightness
-      if (pendingColor || pendingBri != null) runHue(body);
-      else runAction("Kitchen Lights On");
-      pendingColor = null;
-      pendingBri = null;
-      toast("The kitchen lights are on.");
-    } else {
+    const hasStaged = pendingColor || pendingBri != null;
+    if (lightsOn && !hasStaged) {
+      // already on and nothing staged -> turn the lights off
       runAction("Kitchen Lights Off");
       resetLightControls();
+      lightsOn = false;
       toast("The kitchen lights are off.");
+    } else {
+      // enact the staged choices (turn on, or update in place)
+      const body = pendingColor ? Object.assign({}, pendingColor.body) : { on: true };
+      if (pendingBri != null) body.bri = pendingBri;
+      runHue(body);
+      pendingColor = null;
+      pendingBri = null;
+      lightsOn = true;
+      toast("Engaged.");
     }
-    lightsOn = turningOn;                                // optimistic
     updateToggle();
     window.setTimeout(updateLightsStatus, 500);          // confirm from bridge
   });
@@ -335,19 +331,9 @@ function bindLightTools() {
       b.addEventListener("click", () => {
         selectSwatch(b);
         setTrackColor(c.css);              // brightness bar takes the color
-        if (lightsOn) {
-          // Lights on: apply the color now.
-          runHue(c.body);
-          pendingColor = null;
-          toast("Kitchen lights set to " + c.name.toLowerCase() + ".");
-          window.setTimeout(updateLightsStatus, 500);
-        } else {
-          // Lights off: stage for next turn-on (shown on the toggle button +
-          // selected swatch; the hero square stays gray to mean "off").
-          pendingColor = { body: c.body, css: c.css };
-          updateToggle();
-          toast(c.name + " ready — applies when the lights turn on.");
-        }
+        pendingColor = { body: c.body, css: c.css };   // always stage
+        updateToggle();
+        toast(c.name + " staged — press Engage.");
       });
       swatches.appendChild(b);
     });
@@ -356,22 +342,11 @@ function bindLightTools() {
   const slider = document.getElementById("brightness");
   const out = document.getElementById("bri-val");
   if (slider) {
-    let t;
     slider.addEventListener("input", () => {
       const pct = Number(slider.value);
       if (out) out.textContent = pct + "%";
-      const bri = Math.max(1, Math.round((pct / 100) * 254));
-      if (!lightsOn) {
-        pendingBri = bri;                    // lights off: stage for next turn-on
-        updateToggle();
-        return;
-      }
-      clearTimeout(t);                       // throttle while dragging
-      t = window.setTimeout(() => { runHue({ on: true, bri: bri }); }, 150);
-    });
-    // On release (when on), re-read the real state so everything stays in sync.
-    slider.addEventListener("change", () => {
-      if (lightsOn) window.setTimeout(updateLightsStatus, 500);
+      pendingBri = Math.max(1, Math.round((pct / 100) * 254));   // always stage
+      updateToggle();
     });
   }
 }
