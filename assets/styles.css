@@ -182,20 +182,17 @@ button { font: inherit; color: inherit; }
 .kitchen-head {
   padding: 1.3rem 1.4rem 1.5rem;
   margin-bottom: 1.3rem;
+  color: var(--ink);
+  transition: background-color 240ms ease, color 240ms ease;
 }
-.kitchen-conn {
-  display: inline-flex;
-  align-items: center;
+.hero-status {
   font-family: "Space Mono", monospace;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
+  letter-spacing: 0.08em;
+  color: inherit;
 }
-#conn-text { color: var(--muted); }
-#conn-text[data-conn="online"] { color: var(--ink); }
-#conn-text[data-conn="offline"] { color: var(--muted); }
 .kitchen-title {
   display: flex;
   align-items: center;
@@ -206,30 +203,13 @@ button { font: inherit; color: inherit; }
   line-height: 0.9;
   letter-spacing: -0.02em;
   text-transform: uppercase;
+  color: inherit;
 }
 .kitchen-title-ico {
   flex: none;
   width: 0.82em;
   height: 0.82em;
-  color: var(--ink);
-}
-.hero-lights {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin-top: 0.85rem;
-  font-family: "Space Mono", monospace;
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.hero-lights-sq {
-  width: 18px;
-  height: 18px;
-  flex: none;
-  border: 3px solid var(--edge);
-  background: #363636;
+  color: inherit;
 }
 
 /* ---------- Sections ---------- */

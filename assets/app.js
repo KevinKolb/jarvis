@@ -142,18 +142,53 @@ function setConn(online) {
   }
 }
 
-// Approximate the group's current light color as a CSS color for the square.
-function hueColor(action) {
-  if (!action) return "#cccccc";
+// Current light color as [r,g,b] (used to paint the hero background).
+function hslToRgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+function lightRGB(action) {
+  if (!action) return [204, 204, 204];
   if (action.colormode === "ct" || action.sat == null || action.sat < 20) {
     const ct = action.ct || 300;                 // white: warm/cool by color temp
     const f = Math.max(0, Math.min(1, (ct - 153) / (500 - 153)));
     const mix = (a, b) => Math.round(a + (b - a) * f);
-    return "rgb(" + mix(219, 255) + "," + mix(233, 214) + "," + mix(255, 160) + ")";
+    return [mix(219, 255), mix(233, 214), mix(255, 160)];
   }
-  const h = ((action.hue || 0) / 65535) * 360;   // colored: hue + saturation
-  const s = ((action.sat || 0) / 254) * 100;
-  return "hsl(" + h.toFixed(0) + "," + s.toFixed(0) + "%,52%)";
+  return hslToRgb((action.hue || 0) / 65535, (action.sat || 0) / 254, 0.52);
+}
+function textForRgb(rgb) {
+  const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  return lum > 0.6 ? "#141410" : "#ffffff";
+}
+// Paint the hero background/text to reflect the current light color.
+function paintHero(action, on) {
+  const hero = document.getElementById("kitchen-hero");
+  if (!hero) return;
+  if (on && action) {
+    const rgb = lightRGB(action);
+    hero.style.background = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+    hero.style.color = textForRgb(rgb);
+  } else {
+    hero.style.background = "";   // default card surface when off/unknown
+    hero.style.color = "";
+  }
 }
 
 function updateLightsStatus() {
@@ -173,25 +208,22 @@ function updateLightsStatus() {
         slider.value = pct;
         if (briOut) briOut.textContent = pct + "%";
       }
-      const square = document.getElementById("lights-square");
       const text = document.getElementById("lights-line-text");
       if (on) {
         const pct = typeof bri === "number" ? Math.round((bri / 254) * 100) : null;
-        if (text) text.textContent = "Lights on" + (pct != null ? " " + pct + "%" : "");
-        if (square) square.style.background = hueColor(g.action);
-      } else {
-        if (text) text.textContent = "Lights off";
-        if (square) square.style.background = "#363636";
+        if (text) text.textContent = "On" + (pct != null ? " " + pct + "%" : "");
+      } else if (text) {
+        text.textContent = "Off";
       }
+      paintHero(on ? g.action : null, on);
       updateToggle();
     })
     .catch(() => {
       setConn(false);
       lightsOn = null;
       const text = document.getElementById("lights-line-text");
-      const square = document.getElementById("lights-square");
-      if (text) text.textContent = "Lights —";
-      if (square) square.style.background = "#363636";
+      if (text) text.textContent = "—";
+      paintHero(null, false);
       updateToggle();
     });
 }
@@ -216,8 +248,6 @@ function resetLightControls() {
   if (slider) slider.value = 100;
   if (out) out.textContent = "100%";
   selectSwatch(document.querySelector("#swatches .swatch"));
-  const square = document.getElementById("lights-square");
-  if (square) square.style.background = "#363636";   // off -> gray square
 }
 
 /* ---------- On/Off toggle: label + action follow current state ---------- */
