@@ -104,7 +104,7 @@ function runHueProxy(hue) {
 
 /* ---------- Read + show current light status ---------- */
 const LIGHTS_GROUP = "82";   // kitchen Hue group
-const LIGHTS_SAMPLE = "22";  // a representative bulb in that group (true color)
+const LIGHTS_MEMBERS = ["22", "21", "20", "63", "62"];  // its bulbs (for true color)
 let lightsOn = null;         // true / false / null (unknown)
 let pendingColor = null;     // { body, css } current color selection (default white)
 let pendingBri = 254;        // current brightness selection (default 100%)
@@ -254,13 +254,20 @@ function paintHero(on, state) {
 function updateLightsStatus() {
   Promise.all([
     fetch("/hue/groups/" + LIGHTS_GROUP, { cache: "no-store" }).then((r) => r.json()),
-    fetch("/hue/lights/" + LIGHTS_SAMPLE, { cache: "no-store" }).then((r) => r.json()),
+    ...LIGHTS_MEMBERS.map((id) =>
+      fetch("/hue/lights/" + id, { cache: "no-store" }).then((r) => r.json()).catch(() => null)
+    ),
   ])
-    .then(([grp, light]) => {
+    .then(([grp, ...lights]) => {
       setConn(true);
       const gstate = (grp && grp.state) || {};
-      const lstate = (light && light.state) || {};
       const on = !!gstate.any_on;
+      // representative on-bulb for color: prefer one that's actually colored
+      const onLights = lights.filter((l) => l && l.state && l.state.on && l.state.reachable);
+      const rep = onLights.find((l) => l.state.colormode !== "ct" && (l.state.sat || 0) >= 20)
+        || onLights[0]
+        || lights.find((l) => l && l.state);
+      const lstate = rep ? rep.state : {};
       const bri = typeof lstate.bri === "number"
         ? lstate.bri
         : (grp && grp.action ? grp.action.bri : null);
