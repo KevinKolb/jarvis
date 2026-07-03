@@ -145,6 +145,7 @@ const MUSIC = {
     { label: "The Bridge", fav: "CH 27 - The Bridge" },
     { label: "Chill", fav: "CH 55 - SiriusXM Chill" },
     { label: "Classic Vinyl", fav: "CH 26 - Classic Vinyl" },
+    { label: "Beatles", fav: "CH 18 - The Beatles Channel" },
   ],
   jukebox: [
     { label: "Juicy Playlist", fav: "A Juicy Playlist" },
