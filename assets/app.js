@@ -172,6 +172,7 @@ const MUSIC = {
 };
 
 let sonosVol = 0, sonosMuted = false, npTrack = "", npPlaying = false;
+let volHoldUntil = 0;   // your manual volume wins over polling until this time
 
 function renderVol() {
   const out = document.getElementById("vol-val");
@@ -198,7 +199,7 @@ function updateSonos() {
     .then((r) => r.json())
     .then((d) => {
       if (!d || d.error) return;
-      if (typeof d.volume === "number") sonosVol = d.volume;
+      if (typeof d.volume === "number" && Date.now() > volHoldUntil) sonosVol = d.volume;
       sonosMuted = !!d.mute;
       npPlaying = !!d.playing;
       npTrack = d.track || "";
@@ -302,12 +303,14 @@ function bindVolume() {
   let t;
   if (s) s.addEventListener("input", () => {
     sonosVol = Number(s.value);             // 1..99
+    volHoldUntil = Date.now() + 6000;       // your value wins for 6s after adjusting
     renderVol(); renderNP();
     clearTimeout(t);
-    t = window.setTimeout(() => setSonosVolume(sonosVol), 120);
+    t = window.setTimeout(() => setSonosVolume(sonosVol), 150);
   });
   if (b100) b100.addEventListener("click", () => {
     sonosVol = 100; if (s) s.value = 99;
+    volHoldUntil = Date.now() + 6000;
     renderVol(); renderNP(); setSonosVolume(100);
   });
   if (bmute) bmute.addEventListener("click", () => {

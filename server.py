@@ -381,9 +381,20 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/sonos/volume":
             try:
                 level = max(0, min(100, int(json.loads(raw or b"{}").get("level", 0))))
-                self._sonos("GroupRenderingControl", "SetGroupVolume",
-                    '<u:SetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
-                    '<InstanceID>0</InstanceID><DesiredVolume>%d</DesiredVolume></u:SetGroupVolume>' % level)
+                # Set EVERY speaker in the kitchen group to exactly this level
+                # (absolute, not relative) so it never drifts/pops back.
+                ips = [SONOS_IP]
+                for coord, member_ips in self._zone_groups():
+                    if coord == SONOS_UUID and member_ips:
+                        ips = member_ips
+                        break
+                for ip in ips:
+                    try:
+                        self._rc_ip(ip, "SetVolume",
+                            '<u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                            '<Channel>Master</Channel><DesiredVolume>%d</DesiredVolume></u:SetVolume>' % level)
+                    except Exception:
+                        pass
                 self._json({"ok": True, "volume": level})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
