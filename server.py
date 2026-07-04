@@ -18,25 +18,47 @@ import urllib.request
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-# ---- Your Hue bridge (edit these if they ever change) -------------------
-BRIDGE_IP = "192.168.86.151"
-HUE_USER  = "qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a"
+# ---- Hue bridges (this house has two).  Each room's page says which one. --
+BRIDGES = {
+    "main":    {"ip": "192.168.86.151", "user": "qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a"},
+    "bedroom": {"ip": "192.168.86.152", "user": "IzOBRHVpdUoI0O2zatQC6kiDrqaLnaL2Hl7CSPKg"},
+}
+BRIDGE_IP = BRIDGES["main"]["ip"]           # for the startup banner
+HUE_USER  = BRIDGES["main"]["user"]
 PORT      = 80
-# ---- Sonos: the UI says "Kitchen", but the REAL coordinator is the LOUNGE
-#      speaker. Lounge plays; the kitchen pair is secretly grouped to it. ---
-SONOS_IP   = "192.168.86.48"                # LOUNGE — real coordinator/source
+# ---- Sonos.  The kitchen is an illusion: the UI says "Kitchen" but the REAL
+#      coordinator is the LOUNGE speaker, and the kitchen pair secretly joins
+#      it.  Other rooms (e.g. bedroom) are their own coordinator, no illusion.
+SONOS_IP   = "192.168.86.48"                # LOUNGE — kitchen's real coordinator
 SONOS_UUID = "RINCON_F0F6C1CF5CCA01400"     # lounge coordinator UUID
 KITCHEN_IP = "192.168.86.41"                # kitchen pair — secretly grouped to lounge
 SONOS_SN    = "9"                           # Apple Music account serial on this system
 SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
-SONOS_ROOMS = [                            # other rooms you can share kitchen audio to
-    ("Lounge",      "192.168.86.48"),
-    ("Living Room", "192.168.86.34"),
-    ("Bedroom",     "192.168.86.156"),
-    ("Office",      "192.168.86.43"),
-    ("Bathroom",    "192.168.86.159"),
-    ("Entryway",    "192.168.86.38"),
-]
+# Per-room Sonos target: coordinator ip/uuid, and a speaker that secretly
+# joins it ("join", kitchen only).  A page picks its target with ?room=/…"room".
+SONOS_TARGETS = {
+    "kitchen": {"ip": SONOS_IP,       "uuid": SONOS_UUID,                 "join": KITCHEN_IP},
+    "bedroom": {"ip": "192.168.86.156", "uuid": "RINCON_48A6B84B8E5401400", "join": None},
+}
+# Rooms each page can share its audio to (grouped to that page's coordinator).
+ALL_ROOMS = {
+    "Kitchen":     "192.168.86.41",
+    "Lounge":      "192.168.86.48",
+    "Living Room": "192.168.86.34",
+    "Bedroom":     "192.168.86.156",
+    "Office":      "192.168.86.43",
+    "Bathroom":    "192.168.86.159",
+    "Entryway":    "192.168.86.38",
+}
+SHARE_ROOMS = {
+    "kitchen": [("Lounge", ALL_ROOMS["Lounge"]), ("Living Room", ALL_ROOMS["Living Room"]),
+                ("Bedroom", ALL_ROOMS["Bedroom"]), ("Office", ALL_ROOMS["Office"]),
+                ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
+    "bedroom": [("Kitchen", ALL_ROOMS["Kitchen"]), ("Lounge", ALL_ROOMS["Lounge"]),
+                ("Living Room", ALL_ROOMS["Living Room"]), ("Office", ALL_ROOMS["Office"]),
+                ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
+}
+SONOS_ROOMS = SHARE_ROOMS["kitchen"]        # back-compat alias
 # Live playback context that Sonos' metadata doesn't carry (e.g. which
 # playlist is playing — the queue only exposes the current track).
 STATE = {"playlist": ""}
@@ -91,6 +113,19 @@ def save_music(cfg):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # Default Sonos target (kitchen) — overridden per request by _set_target.
+    s_room = "kitchen"
+    s_ip = SONOS_IP
+    s_uuid = SONOS_UUID
+    s_join = KITCHEN_IP
+
+    def _set_target(self, room):
+        """Point this request at a room's Sonos coordinator (defaults to kitchen)."""
+        t = SONOS_TARGETS.get(room)
+        self.s_room = room if t else "kitchen"
+        t = t or SONOS_TARGETS["kitchen"]
+        self.s_ip, self.s_uuid, self.s_join = t["ip"], t["uuid"], t["join"]
+
     # Serve files quietly; only note errors.
     def log_message(self, *args):
         pass
@@ -100,9 +135,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store, must-revalidate")
         super().end_headers()
 
-    def _bridge(self, method, bridge_path, body=None):
-        """Forward a request to the Hue bridge and return its raw bytes."""
-        url = "http://{}/api/{}{}".format(BRIDGE_IP, HUE_USER, bridge_path)
+    def _bridge(self, method, bridge_path, body=None, bridge="main"):
+        """Forward a request to the named Hue bridge and return its raw bytes."""
+        b = BRIDGES.get(bridge, BRIDGES["main"])
+        url = "http://{}/api/{}{}".format(b["ip"], b["user"], bridge_path)
         req = urllib.request.Request(
             url, data=body, method=method,
             headers={"Content-Type": "application/json"} if body else {},
@@ -116,7 +152,7 @@ class Handler(SimpleHTTPRequestHandler):
                '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
                's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
                '<s:Body>%s</s:Body></s:Envelope>') % inner
-        url = "http://%s:1400/MediaRenderer/%s/Control" % (SONOS_IP, service)
+        url = "http://%s:1400/MediaRenderer/%s/Control" % (self.s_ip, service)
         req = urllib.request.Request(
             url, data=env.encode(),
             headers={"Content-Type": 'text/xml; charset="utf-8"',
@@ -131,7 +167,7 @@ class Handler(SimpleHTTPRequestHandler):
                's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
                '<s:Body>%s</s:Body></s:Envelope>') % inner
         req = urllib.request.Request(
-            "http://%s:1400/MediaServer/ContentDirectory/Control" % SONOS_IP, data=env.encode(),
+            "http://%s:1400/MediaServer/ContentDirectory/Control" % self.s_ip, data=env.encode(),
             headers={"Content-Type": 'text/xml; charset="utf-8"',
                      "SOAPAction": '"urn:schemas-upnp-org:service:ContentDirectory:1#%s"' % action})
         with urllib.request.urlopen(req, timeout=6) as resp:
@@ -177,7 +213,7 @@ class Handler(SimpleHTTPRequestHandler):
                 % (esc(res), esc(meta)))
             self._sonos("AVTransport", "SetAVTransportURI",
                 '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
-                '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+                '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
         else:                                              # radio stream -> direct
             self._sonos("AVTransport", "SetAVTransportURI",
                 '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
@@ -293,7 +329,7 @@ class Handler(SimpleHTTPRequestHandler):
             % (esc(res), esc(meta)))
         self._sonos("AVTransport", "SetAVTransportURI",
             '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
-            '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+            '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
         self._set_play_mode(shuffle)
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
@@ -304,7 +340,7 @@ class Handler(SimpleHTTPRequestHandler):
                's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
                '<u:GetZoneGroupState xmlns:u="urn:schemas-upnp-org:service:ZoneGroupTopology:1"></u:GetZoneGroupState>'
                '</s:Body></s:Envelope>')
-        req = urllib.request.Request("http://%s:1400/ZoneGroupTopology/Control" % SONOS_IP, data=env.encode(),
+        req = urllib.request.Request("http://%s:1400/ZoneGroupTopology/Control" % self.s_ip, data=env.encode(),
             headers={"Content-Type": 'text/xml; charset="utf-8"',
                      "SOAPAction": '"urn:schemas-upnp-org:service:ZoneGroupTopology:1#GetZoneGroupState"'})
         xml = urllib.request.urlopen(req, timeout=6).read().decode("utf-8", "ignore")
@@ -343,12 +379,15 @@ class Handler(SimpleHTTPRequestHandler):
         return int(m.group(1)) if m else 30
 
     def _ensure_kitchen_grouped(self):
-        """The illusion: silently join the kitchen pair to the lounge coordinator,
-        so 'Kitchen' plays whatever the (hidden) lounge speaker is playing."""
+        """Kitchen illusion: silently join the kitchen pair (s_join) to the room's
+        coordinator, so 'Kitchen' plays the hidden lounge speaker. No-op for rooms
+        (e.g. bedroom) that are their own coordinator (s_join is None)."""
+        if not self.s_join:
+            return
         try:
-            self._avt_ip(KITCHEN_IP, "SetAVTransportURI",
+            self._avt_ip(self.s_join, "SetAVTransportURI",
                 '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
-                '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+                '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
         except Exception:
             pass
 
@@ -370,6 +409,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(obj).encode())
 
     def do_GET(self):
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        self._set_target(q.get("page", ["kitchen"])[0])
+        sp = self.path.split("?")[0]              # path without ?page=… for route matching
         # Image proxy so the browser can sample album-art pixels same-origin
         # (a canvas can't read cross-origin CDN images).  GET /art?u=<url>
         if self.path.startswith("/art?"):
@@ -394,7 +436,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         # Read Sonos volume:  GET /sonos/volume
-        if self.path == "/sonos/volume":
+        if sp == "/sonos/volume":
             try:
                 xml = self._sonos("GroupRenderingControl", "GetGroupVolume",
                     '<u:GetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
@@ -405,7 +447,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json({"error": str(exc)}, 502)
             return
 
-        if self.path == "/sonos/mute":
+        if sp == "/sonos/mute":
             try:
                 xml = self._sonos("GroupRenderingControl", "GetGroupMute",
                     '<u:GetGroupMute xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
@@ -417,7 +459,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         # Combined state: volume, mute, and what's playing (as specific as possible)
-        if self.path == "/sonos/state":
+        if sp == "/sonos/state":
             try:
                 vx = self._sonos("GroupRenderingControl", "GetGroupVolume",
                     '<u:GetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1"><InstanceID>0</InstanceID></u:GetGroupVolume>')
@@ -480,7 +522,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if not art:   # radio: logo lives in the station (media) metadata, not the track
                     art = html.unescape(first(r"<upnp:albumArtURI[^>]*>(.*?)</upnp:albumArtURI>", src)).strip()
                 if art.startswith("/"):
-                    art = "http://%s:1400%s" % (SONOS_IP, art)
+                    art = "http://%s:1400%s" % (self.s_ip, art)
                 # show the remembered playlist name only while a queue is playing
                 cur_uri = first(r"<CurrentURI>(.*?)</CurrentURI>", mi)
                 playlist = STATE["playlist"] if (cur_uri.startswith("x-rincon-queue") and STATE["playlist"]) else ""
@@ -490,30 +532,33 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json({"error": str(exc)}, 502)
             return
 
-        # Rooms + whether each is currently grouped to the (hidden) lounge coordinator.
-        # Lounge itself is always the coordinator, so its button tracks mute instead.
-        if self.path == "/sonos/rooms":
+        # Rooms this page can share to + whether each is grouped to its coordinator.
+        # On the kitchen page, Lounge IS the coordinator, so its button tracks mute.
+        if sp == "/sonos/rooms":
             try:
                 group_ips = set()
                 for coord, ips in self._zone_groups():
-                    if coord == SONOS_UUID:
+                    if coord == self.s_uuid:
                         group_ips = set(ips)
-                lounge_on = not self._lounge_muted()
-                rooms = [{"name": n, "grouped": (lounge_on if n == "Lounge" else ip in group_ips)}
-                         for (n, ip) in SONOS_ROOMS]
+                lounge_on = (self.s_room == "kitchen") and (not self._lounge_muted())
+                rooms = [{"name": n,
+                          "grouped": (lounge_on if (n == "Lounge" and self.s_room == "kitchen")
+                                      else ip in group_ips)}
+                         for (n, ip) in SHARE_ROOMS.get(self.s_room, SONOS_ROOMS)]
                 self._json({"rooms": rooms})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
 
         # Music buttons config (for the kitchen page + admin)
-        if self.path == "/music":
+        if sp == "/music":
             self._json(load_music())
             return
-        # Read light state:  GET /hue/groups/82  ->  bridge /groups/82
+        # Read light state:  GET /hue/<bridge>/groups/82  ->  that bridge /groups/82
         if self.path.startswith("/hue/"):
             try:
-                result = self._bridge("GET", self.path[4:])
+                bkey, _, bpath = self.path[5:].partition("/")
+                result = self._bridge("GET", "/" + bpath.split("?")[0], bridge=bkey)
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -530,16 +575,20 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length) if length else b"{}"
+        try:
+            self._set_target(json.loads(raw or b"{}").get("page") or "kitchen")
+        except Exception:
+            self._set_target("kitchen")
 
         # Set Sonos group volume:  POST /sonos/volume  {"level": 0-100}
         if self.path == "/sonos/volume":
             try:
                 level = max(0, min(100, int(json.loads(raw or b"{}").get("level", 0))))
-                # Set EVERY speaker in the kitchen group to exactly this level
+                # Set EVERY speaker in this room's group to exactly this level
                 # (absolute, not relative) so it never drifts/pops back.
-                ips = [SONOS_IP]
+                ips = [self.s_ip]
                 for coord, member_ips in self._zone_groups():
-                    if coord == SONOS_UUID and member_ips:
+                    if coord == self.s_uuid and member_ips:
                         ips = member_ips
                         break
                 for ip in ips:
@@ -571,17 +620,17 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 p = json.loads(raw or b"{}")
                 room, join = p.get("room"), bool(p.get("join"))
-                ip = dict(SONOS_ROOMS).get(room)
+                ip = dict(SHARE_ROOMS.get(self.s_room, SONOS_ROOMS)).get(room)
                 if not ip:
                     raise Exception("unknown room: %s" % room)
-                if room == "Lounge":
-                    # Lounge is the hidden coordinator — never ungroup it (that would
-                    # dissolve everyone's group). Toggling it just mutes/unmutes lounge.
+                if room == "Lounge" and self.s_room == "kitchen":
+                    # Lounge is the kitchen's hidden coordinator — never ungroup it (that
+                    # would dissolve everyone's group). Toggling it mutes/unmutes lounge.
                     self._rc_ip(ip, "SetMute",
                         '<u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
                         '<Channel>Master</Channel><DesiredMute>%d</DesiredMute></u:SetMute>' % (0 if join else 1))
                 elif join:
-                    # speakers currently in this room (before it joins the kitchen)
+                    # speakers currently in this room (before it joins this coordinator)
                     room_ips = [ip]
                     for coord, ips in self._zone_groups():
                         if ip in ips:
@@ -589,7 +638,7 @@ class Handler(SimpleHTTPRequestHandler):
                             break
                     self._avt_ip(ip, "SetAVTransportURI",
                         '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
-                        '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+                        '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
                     # pop the added room to the kitchen volume (then group volume keeps them together)
                     kvol = self._kitchen_volume()
                     for rip in room_ips:
@@ -704,7 +753,7 @@ class Handler(SimpleHTTPRequestHandler):
             payload = json.loads(raw or b"{}")
             path = payload.get("path", "")            # e.g. /groups/82/action
             body = json.dumps(payload.get("body", {})).encode()
-            result = self._bridge("PUT", path, body)
+            result = self._bridge("PUT", path, body, bridge=payload.get("bridge", "main"))
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()

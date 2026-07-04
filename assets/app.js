@@ -97,14 +97,22 @@ function runHueProxy(hue) {
   fetch("/hue", {                       // same-origin: the Pi, not the bridge
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(hue),
+    body: JSON.stringify(Object.assign({ bridge: HUE_BRIDGE }, hue)),
     keepalive: true,
   }).catch(() => { /* relay unreachable — Pi off, or not on SpamNet */ });
 }
 
+/* ---------- Per-room config (set by data-* on .page) ---------- */
+const PAGE = document.querySelector(".page") || document.body;
+const CFG = PAGE.dataset || {};
+const ROOM = CFG.sonosRoom || "kitchen";                 // Sonos target room
+const HUE_BRIDGE = CFG.hueBridge || "main";              // which Hue bridge
+const RQ = "?page=" + encodeURIComponent(ROOM);          // GET query for sonos
+const withRoom = (o) => JSON.stringify(Object.assign({ page: ROOM }, o));  // POST body
+
 /* ---------- Read + show current light status ---------- */
-const LIGHTS_GROUP = "82";   // kitchen Hue group
-const LIGHTS_MEMBERS = ["22", "21", "20", "63", "62"];  // its bulbs (for true color)
+const LIGHTS_GROUP = CFG.lightsGroup || "82";            // Hue group id
+const LIGHTS_MEMBERS = (CFG.lightsMembers || "22,21,20,63,62").split(",");  // bulbs (true color)
 let lightsOn = null;         // true / false / null (unknown)
 let pendingColor = null;     // { body, css } current color selection (default white)
 let pendingBri = 254;        // current brightness selection (default 100%)
@@ -212,7 +220,7 @@ function renderNP() {
 }
 function setSonosVolume(level) {
   fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ level: level }), keepalive: true }).catch(() => {});
+    body: withRoom({ level: level }), keepalive: true }).catch(() => {});
 }
 let lastArtUrl = "";
 // Pull a lively accent color out of the album art and expose it as CSS vars.
@@ -250,7 +258,7 @@ function setArtAccent(color) {
   root.setProperty("--art-ink", lum > 0.62 ? "#111111" : "#ffffff");
 }
 function updateSonos() {
-  fetch("/sonos/state", { cache: "no-store" })
+  fetch("/sonos/state" + RQ, { cache: "no-store" })
     .then((r) => r.json())
     .then((d) => {
       if (!d || d.error) return;
@@ -302,25 +310,25 @@ function updateSonos() {
 }
 function playFavorite(fav, label, shuffle) {
   fetch("/sonos/favorite", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: fav, shuffle: !!shuffle }), keepalive: true }).catch(() => {});
+    body: withRoom({ name: fav, shuffle: !!shuffle }), keepalive: true }).catch(() => {});
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
 function playApple(apple, label) {   // apple = {kind, id, title}
   fetch("/sonos/apple", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(apple), keepalive: true }).catch(() => {});
+    body: withRoom(apple), keepalive: true }).catch(() => {});
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
 function playStream(url, label) {   // direct stream URL (like Sonos "Play a URL")
   fetch("/sonos/uri", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: url, title: label }), keepalive: true }).catch(() => {});
+    body: withRoom({ url: url, title: label }), keepalive: true }).catch(() => {});
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
 function playPodcast(feed, label) {   // newest episode from an Apple Podcasts link / RSS feed
   fetch("/sonos/podcast", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ feed: feed }), keepalive: true }).catch(() => {});
+    body: withRoom({ feed: feed }), keepalive: true }).catch(() => {});
   toast("Playing latest " + label + "…");
   window.setTimeout(updateSonos, 2500);
 }
@@ -330,9 +338,9 @@ function renderShare() {
   function setRoom(btn, name, join) {
     btn.classList.toggle("on", join);
     fetch("/sonos/group", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ room: name, join: join }), keepalive: true }).catch(() => {});
+      body: withRoom({ room: name, join: join }), keepalive: true }).catch(() => {});
   }
-  fetch("/sonos/rooms", { cache: "no-store" })
+  fetch("/sonos/rooms" + RQ, { cache: "no-store" })
     .then((r) => r.json())
     .then((d) => {
       if (!d || !d.rooms) return;
@@ -374,8 +382,10 @@ function renderShare() {
         macros.push({ btn: btn, names: names });
         host.appendChild(btn);
       }
-      makeMacro("FOH", ["Lounge", "Living Room"]);        // + Kitchen (always grouped)
-      makeMacro("BOH", ["Bedroom", "Office", "Bathroom"]);
+      if (ROOM === "kitchen") {                            // FOH/BOH are kitchen-specific
+        makeMacro("FOH", ["Lounge", "Living Room"]);      // + Kitchen (always grouped)
+        makeMacro("BOH", ["Bedroom", "Office", "Bathroom"]);
+      }
       d.rooms.forEach((rm) => {
         const b = document.createElement("button");
         b.type = "button";
@@ -568,14 +578,14 @@ function paintHero(on, state) {
     bg = "#000000";      // lights off -> black
     fg = "#b8b8b8";      // light gray text
   }
-  const hero = document.getElementById("kitchen-hero");   // kitchen page: tint the whole page
+  const hero = document.getElementById(ROOM + "-hero");   // room page: tint the whole page
   if (hero) {
     document.body.classList.add("tinted");
     document.body.style.background = bg;
     hero.style.color = fg;
     document.documentElement.style.setProperty("--page-ink", fg);   // footer status matches the title
   }
-  const card = document.getElementById("room-kitchen");   // home page: tint the Kitchen tile
+  const card = document.getElementById("room-" + ROOM);   // home page: tint the room tile
   if (card) { card.style.background = bg; card.style.color = fg; }
 }
 

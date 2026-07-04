@@ -19,6 +19,7 @@ scp -q -r \
   "$DIR/index.html" \
   "$DIR/admin.html" \
   "$DIR/kitchen" \
+  "$DIR/bedroom" \
   "$DIR/assets" \
   "$DIR/server.py" \
   "$DIR/favicon.ico" \
