@@ -30,11 +30,11 @@ KITCHEN_IP = "192.168.86.41"                # kitchen pair — secretly grouped 
 SONOS_SN    = "9"                           # Apple Music account serial on this system
 SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
 SONOS_ROOMS = [                            # other rooms you can share kitchen audio to
+    ("Lounge",      "192.168.86.48"),
     ("Living Room", "192.168.86.34"),
     ("Bedroom",     "192.168.86.156"),
-    ("Bathroom",    "192.168.86.159"),
     ("Office",      "192.168.86.43"),
-    ("Lounge",      "192.168.86.48"),
+    ("Bathroom",    "192.168.86.159"),
     ("Entryway",    "192.168.86.38"),
 ]
 # Live playback context that Sonos' metadata doesn't carry (e.g. which

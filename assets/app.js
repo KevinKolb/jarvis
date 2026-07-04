@@ -332,8 +332,15 @@ function renderShare() {
       if (!d || !d.rooms) return;
       host.innerHTML = "";
       const roomBtns = [];
-      const syncAll = () =>
+      const macros = [];
+      // keep All + each macro lit only when all of their rooms are on
+      const syncGroups = () => {
         all.classList.toggle("on", roomBtns.length > 0 && roomBtns.every((x) => x.btn.classList.contains("on")));
+        macros.forEach((m) => {
+          const targets = roomBtns.filter((x) => m.names.indexOf(x.name) !== -1);
+          m.btn.classList.toggle("on", targets.length > 0 && targets.every((x) => x.btn.classList.contains("on")));
+        });
+      };
       const all = document.createElement("button");
       all.type = "button";
       all.className = "chan-btn share-btn share-all";
@@ -341,10 +348,28 @@ function renderShare() {
       all.addEventListener("click", () => {
         const join = roomBtns.some((x) => !x.btn.classList.contains("on"));   // any off -> turn all on
         roomBtns.forEach((x) => setRoom(x.btn, x.name, join));
-        all.classList.toggle("on", join);
+        syncGroups();
         toast(join ? "Sharing to all rooms." : "Stopped sharing to all rooms.");
       });
       host.appendChild(all);
+      // FOH / BOH: toggle a fixed subset of rooms at once
+      function makeMacro(label, names) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chan-btn share-btn share-all";
+        btn.textContent = label;
+        btn.addEventListener("click", () => {
+          const targets = roomBtns.filter((x) => names.indexOf(x.name) !== -1);
+          const join = targets.some((x) => !x.btn.classList.contains("on"));
+          targets.forEach((x) => setRoom(x.btn, x.name, join));
+          syncGroups();
+          toast(join ? "Sharing to " + label + "." : "Stopped " + label + " sharing.");
+        });
+        macros.push({ btn: btn, names: names });
+        host.appendChild(btn);
+      }
+      makeMacro("FOH", ["Lounge", "Living Room"]);        // + Kitchen (always grouped)
+      makeMacro("BOH", ["Bedroom", "Office", "Bathroom"]);
       d.rooms.forEach((rm) => {
         const b = document.createElement("button");
         b.type = "button";
@@ -354,13 +379,13 @@ function renderShare() {
         b.addEventListener("click", () => {
           const join = !b.classList.contains("on");
           setRoom(b, rm.name, join);
-          syncAll();
+          syncGroups();
           toast(join ? "Sharing kitchen audio to " + rm.name + "." : "Stopped sharing to " + rm.name + ".");
         });
         roomBtns.push({ btn: b, name: rm.name });
         host.appendChild(b);
       });
-      syncAll();
+      syncGroups();
     })
     .catch(() => {});
 }
