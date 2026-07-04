@@ -349,12 +349,24 @@ class Handler(SimpleHTTPRequestHandler):
                 stream = tag("r:streamContent")
                 title, creator = tag("dc:title"), tag("dc:creator")
                 # the live song/track, if any
-                if not junk(stream):
+                song = ""
+                if "|" in stream and ("TITLE" in stream.upper() or "ARTIST" in stream.upper()):
+                    # SiriusXM style: "TYPE=SNG|TITLE <title>|ARTIST <artist>|ALBUM <album>"
+                    fields = {}
+                    for seg in stream.split("|"):
+                        seg = seg.strip()
+                        for key in ("TITLE", "ARTIST"):
+                            if seg.upper().startswith(key):
+                                fields[key] = seg[len(key):].strip().lstrip("=").strip()
+                    t, a = fields.get("TITLE", ""), fields.get("ARTIST", "")
+                    if t and a:
+                        song = a + " — " + t
+                    elif t or a:
+                        song = t or a
+                elif not junk(stream):
                     song = stream
                 elif title and not junk(title):
                     song = (creator + " — " + title) if creator and not junk(creator) else title
-                else:
-                    song = ""
                 # station name (from media metadata); drop buffering placeholders
                 st = station
                 if not st or "zpstr" in st.lower() or "buffering" in st.lower():
