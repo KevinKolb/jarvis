@@ -357,6 +357,8 @@ class Handler(SimpleHTTPRequestHandler):
                 if not track:
                     track = station
                 art = tag("upnp:albumArtURI")
+                if not art:   # radio: logo lives in the station (media) metadata, not the track
+                    art = html.unescape(first(r"<upnp:albumArtURI[^>]*>(.*?)</upnp:albumArtURI>", src)).strip()
                 if art.startswith("/"):
                     art = "http://%s:1400%s" % (SONOS_IP, art)
                 self._json({"volume": vol, "mute": mute, "playing": playing, "track": track, "art": art})
