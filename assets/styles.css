@@ -517,14 +517,22 @@ button { font: inherit; color: inherit; }
 /* ---------- Music channel buttons (Radio / Jukebox / Podcasts) ---------- */
 .chan-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;               /* one line -> horizontal scroll, no vertical sprawl */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;   /* momentum swipe on iOS/old iPad */
   margin-bottom: 0.5rem;
+  padding: 2px 0 6px;              /* room for the button drop-shadow */
+  scrollbar-width: none;           /* Firefox: hide scrollbar */
 }
+.chan-row::-webkit-scrollbar { display: none; }   /* WebKit: hide scrollbar */
 .chan-row:last-child { margin-bottom: 0; }
 .chan-btn {
   -webkit-appearance: none;
   appearance: none;
-  margin: 0 0.5rem 0.5rem 0;   /* gap fallback for old Safari */
+  flex: 0 0 auto;                  /* keep full size; never shrink or wrap */
+  white-space: nowrap;
+  margin: 0 0.5rem 0 0;            /* right gap only */
   padding: 0.65rem 0.9rem;
   border: 3px solid var(--edge);
   border-radius: 0;
