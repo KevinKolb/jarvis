@@ -427,6 +427,8 @@ class Handler(SimpleHTTPRequestHandler):
                 st = station
                 if not st or "zpstr" in st.lower() or "buffering" in st.lower():
                     st = ""
+                if re.match(r"CH\s*\d", st):        # SiriusXM channel -> label it
+                    st = "SXM " + st
                 # song + station returned separately so the client can put them on
                 # two lines (track leads, station second)
                 art = tag("upnp:albumArtURI")
