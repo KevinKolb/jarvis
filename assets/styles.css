@@ -16,6 +16,10 @@
   --lights: #ffc400;
   --music: #2b50ff;
 
+  /* accent pulled live from the album art (gray until it loads) */
+  --art-accent: #9a9a9a;
+  --art-ink: #ffffff;
+
   --sh: 5px 5px 0 var(--edge);
   --sh-lg: 7px 7px 0 var(--edge);
   --sh-sm: 3px 3px 0 var(--edge);
@@ -430,9 +434,13 @@ button { font: inherit; color: inherit; }
 .bri-end:active { transform: translate(1px, 1px); box-shadow: none; }
 .bri-off { background: #000000; color: #b8b8b8; }
 
-/* volume slider: black -> music blue; 100% button blue */
-#volume { --track-color: var(--music); }
-.vol-max { background: var(--music); color: #ffffff; }
+/* volume slider + 100% button tint to the album-art accent (gray until loaded) */
+#volume { --track-color: var(--art-accent); }
+.vol-max {
+  background: var(--art-accent);
+  color: var(--art-ink);
+  transition: background-color 240ms ease, color 240ms ease;
+}
 
 /* color swatches */
 .swatches {
@@ -479,7 +487,8 @@ button { font: inherit; color: inherit; }
   width: 100%;
   max-width: 100%;
   margin-top: 0.8rem;
-  border: 3px solid var(--edge);
+  border: 3px solid var(--art-accent);
+  transition: border-color 240ms ease;
 }
 .np-art[hidden] { display: none; }
 
@@ -506,7 +515,11 @@ button { font: inherit; color: inherit; }
 }
 .chan-btn:hover { transform: translate(-2px, -2px); box-shadow: var(--sh); }
 .chan-btn:active { transform: translate(2px, 2px); box-shadow: none; background: var(--music); color: #fff; }
-.share-btn.on { background: var(--music); color: #fff; }   /* grouped to kitchen */
+.share-btn.on {   /* grouped to kitchen — tint to the album-art accent */
+  background: var(--art-accent);
+  color: var(--art-ink);
+  transition: background-color 240ms ease, color 240ms ease;
+}
 
 /* ---------- Footer (Rooms + connection status) ---------- */
 .page-footer {

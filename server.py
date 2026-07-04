@@ -15,6 +15,7 @@ import json
 import os
 import re
 import urllib.request
+import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 # ---- Your Hue bridge (edit these if they ever change) -------------------
@@ -133,7 +134,8 @@ class Handler(SimpleHTTPRequestHandler):
         with urllib.request.urlopen(req, timeout=6) as resp:
             return resp.read().decode("utf-8", "ignore")
 
-    def _find_favorite(self, name):
+    def _favorites_map(self):
+        """Browse Sonos favorites (FV:2) once -> {title: (uri, resMD)}."""
         xml = self._sonos_ct("Browse",
             '<u:Browse xmlns:u="urn:schemas-upnp-org:service:ContentDirectory:1">'
             '<ObjectID>FV:2</ObjectID><BrowseFlag>BrowseDirectChildren</BrowseFlag>'
@@ -141,13 +143,19 @@ class Handler(SimpleHTTPRequestHandler):
             '<RequestedCount>300</RequestedCount><SortCriteria></SortCriteria></u:Browse>')
         m = re.search(r"<Result>(.*?)</Result>", xml, re.S)
         didl = html.unescape(m.group(1)) if m else ""
+        out = {}
         for item in re.findall(r"<item.*?</item>", didl, re.S):
             t = re.search(r"<dc:title>(.*?)</dc:title>", item, re.S)
-            if t and html.unescape(t.group(1)).strip() == name:
-                res = html.unescape(re.search(r"<res[^>]*>(.*?)</res>", item, re.S).group(1))
-                md = re.search(r"<r:resMD>(.*?)</r:resMD>", item, re.S)
-                return res, (html.unescape(md.group(1)) if md else "")
-        return None, None
+            r = re.search(r"<res[^>]*>(.*?)</res>", item, re.S)
+            if not (t and r):
+                continue
+            md = re.search(r"<r:resMD>(.*?)</r:resMD>", item, re.S)
+            out[html.unescape(t.group(1)).strip()] = (
+                html.unescape(r.group(1)), html.unescape(md.group(1)) if md else "")
+        return out
+
+    def _find_favorite(self, name):
+        return self._favorites_map().get(name, (None, None))
 
     def _play_favorite(self, name, shuffle=False):
         self._ensure_kitchen_grouped()
@@ -292,6 +300,29 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(obj).encode())
 
     def do_GET(self):
+        # Image proxy so the browser can sample album-art pixels same-origin
+        # (a canvas can't read cross-origin CDN images).  GET /art?u=<url>
+        if self.path.startswith("/art?"):
+            try:
+                u = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("u", [""])[0]
+                if not u.startswith("http"):
+                    raise Exception("bad url")
+                req = urllib.request.Request(u, headers={"User-Agent": "JARVIS"})
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    data = r.read()
+                    ctype = r.headers.get("Content-Type", "image/jpeg")
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception as exc:
+                self.send_response(502)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(("art proxy error: %s" % exc).encode())
+            return
+
         # Read Sonos volume:  GET /sonos/volume
         if self.path == "/sonos/volume":
             try:

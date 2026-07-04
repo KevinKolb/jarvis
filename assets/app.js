@@ -207,6 +207,41 @@ function setSonosVolume(level) {
   fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ level: level }), keepalive: true }).catch(() => {});
 }
+let lastArtUrl = "";
+// Pull a lively accent color out of the album art and expose it as CSS vars.
+function extractArtColor(img) {
+  try {
+    const c = document.createElement("canvas");
+    const w = (c.width = 24), h = (c.height = 24);
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h).data;
+    let ar = 0, ag = 0, ab = 0, n = 0, best = null, bestScore = -1;
+    for (let i = 0; i < px.length; i += 4) {
+      const R = px[i], G = px[i + 1], B = px[i + 2], A = px[i + 3];
+      if (A < 128) continue;
+      const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
+      if (mx > 245 && mn > 235) continue;   // skip near-white
+      if (mx < 18) continue;                 // skip near-black
+      ar += R; ag += G; ab += B; n++;
+      const score = (mx - mn) + mx * 0.15;   // prefer saturated + bright
+      if (score > bestScore) { bestScore = score; best = [R, G, B]; }
+    }
+    if (!n) return null;
+    const avg = [ar / n, ag / n, ab / n];
+    const pick = best || avg;                // blend vivid pixel with the average
+    const mix = pick.map((v, k) => Math.round(v * 0.6 + avg[k] * 0.4));
+    return "#" + mix.map((x) => Math.max(0, Math.min(255, x)).toString(16).padStart(2, "0")).join("");
+  } catch (e) { return null; }
+}
+function setArtAccent(color) {
+  const c = color || "#9a9a9a";             // gray fallback
+  const root = document.documentElement.style;
+  root.setProperty("--art-accent", c);
+  const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  root.setProperty("--art-ink", lum > 0.62 ? "#111111" : "#ffffff");
+}
 function updateSonos() {
   fetch("/sonos/state", { cache: "no-store" })
     .then((r) => r.json())
@@ -219,8 +254,21 @@ function updateSonos() {
       npStation = d.station || "";
       const art = document.getElementById("np-art");
       if (art) {
-        if (d.playing && d.art) { art.src = d.art; art.hidden = false; }
-        else { art.hidden = true; art.removeAttribute("src"); }
+        if (d.playing && d.art) {
+          if (d.art !== lastArtUrl) {
+            lastArtUrl = d.art;
+            art.src = d.art;                 // display straight from the source
+            setArtAccent(null);              // gray until the new color loads
+            const probe = new Image();       // sample pixels via the same-origin proxy
+            probe.crossOrigin = "anonymous";
+            probe.onload = () => setArtAccent(extractArtColor(probe));
+            probe.onerror = () => setArtAccent(null);
+            probe.src = "/art?u=" + encodeURIComponent(d.art);
+          }
+          art.hidden = false;
+        } else if (lastArtUrl) {
+          lastArtUrl = ""; art.hidden = true; art.removeAttribute("src"); setArtAccent(null);
+        }
       }
       renderVol();
       renderNP();
