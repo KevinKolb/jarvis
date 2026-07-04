@@ -566,6 +566,7 @@ function paintHero(on, state) {
     document.body.classList.add("tinted");
     document.body.style.background = bg;
     hero.style.color = fg;
+    document.documentElement.style.setProperty("--page-ink", fg);   // footer status matches the title
   }
   const card = document.getElementById("room-kitchen");   // home page: tint the Kitchen tile
   if (card) { card.style.background = bg; card.style.color = fg; }

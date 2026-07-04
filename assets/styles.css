@@ -229,9 +229,10 @@ button { font: inherit; color: inherit; }
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
-#conn-text { color: var(--muted); }
-#conn-text[data-conn="online"] { color: var(--ink); }
-#conn-text[data-conn="offline"] { color: var(--muted); }
+/* online/offline text always matches the KITCHEN title color (the dot shows state) */
+#conn-text,
+#conn-text[data-conn="online"],
+#conn-text[data-conn="offline"] { color: var(--page-ink, var(--ink)); }
 .kitchen-title {
   display: flex;
   align-items: center;
