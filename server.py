@@ -184,6 +184,25 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
 
+    def _play_stream(self, url, title="Stream"):
+        """Play a plain internet-radio / audio stream URL directly (no service)."""
+        self._ensure_kitchen_grouped()
+        esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        meta = ('<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
+                'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
+                'xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" '
+                'xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">'
+                '<item id="-1" parentID="-1" restricted="true"><dc:title>%s</dc:title>'
+                '<upnp:class>object.item.audioItem.audioBroadcast</upnp:class>'
+                '<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">RINCON_AssociatedZPUDN</desc>'
+                '</item></DIDL-Lite>') % esc(title)
+        self._sonos("AVTransport", "SetAVTransportURI",
+            '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+            '<CurrentURI>%s</CurrentURI><CurrentURIMetaData>%s</CurrentURIMetaData></u:SetAVTransportURI>'
+            % (esc(url), esc(meta)))
+        self._sonos("AVTransport", "Play",
+            '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+
     def _set_play_mode(self, shuffle):
         self._sonos("AVTransport", "SetPlayMode",
             '<u:SetPlayMode xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
@@ -539,6 +558,20 @@ class Handler(SimpleHTTPRequestHandler):
                 name = p.get("name", "")
                 self._play_favorite(name, bool(p.get("shuffle")))
                 self._json({"ok": True, "name": name})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Play a direct stream URL (like the Sonos "Play a URL"):
+        #   POST /sonos/uri  {"url": "https://.../stream.mp3", "title": "..."}
+        if self.path == "/sonos/uri":
+            try:
+                p = json.loads(raw or b"{}")
+                url = (p.get("url") or "").strip()
+                if not (url.startswith("http") or url.startswith("x-")):
+                    raise Exception("bad url")
+                self._play_stream(url, p.get("title", "Stream"))
+                self._json({"ok": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return

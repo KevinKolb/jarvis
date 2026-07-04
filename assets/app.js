@@ -287,6 +287,12 @@ function playApple(apple, label) {   // apple = {kind, id, title}
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
+function playStream(url, label) {   // direct stream URL (like Sonos "Play a URL")
+  fetch("/sonos/uri", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: url, title: label }), keepalive: true }).catch(() => {});
+  toast("Playing " + label + ".");
+  window.setTimeout(updateSonos, 1500);
+}
 function renderShare() {
   const host = document.getElementById("row-share");
   if (!host) return;
@@ -352,8 +358,9 @@ function renderMusicRows(M) {
         b.className = "chan-btn";
         b.textContent = c.label;
         b.addEventListener("click", () =>
-          c.apple ? playApple(Object.assign({ shuffle: !!c.shuffle }, c.apple), c.label)
-                  : playFavorite(c.fav, c.label, !!c.shuffle));
+          c.url   ? playStream(c.url, c.label)
+          : c.apple ? playApple(Object.assign({ shuffle: !!c.shuffle }, c.apple), c.label)
+                    : playFavorite(c.fav, c.label, !!c.shuffle));
         host.appendChild(b);
       });
     });
