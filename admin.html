@@ -12,29 +12,30 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/styles.css">
   <style>
-    .admin-form { display: flex; flex-direction: column; gap: 0.9rem; }
-    .admin-form label { display: flex; flex-direction: column; gap: 0.35rem;
+    .admin-form > * { margin-bottom: 0.9rem; }
+    .admin-form > *:last-child { margin-bottom: 0; }
+    .admin-form label { display: block;
       font-family: "Space Mono", monospace; font-size: 0.72rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .admin-form label input, .admin-form label select { margin-top: 0.35rem; }
     .admin-form input[type=text], .admin-form select {
       -webkit-appearance: none; appearance: none; font: inherit; font-size: 1rem;
       padding: 0.7rem 0.8rem; border: 3px solid var(--edge); border-radius: 0;
       background: var(--surface); color: var(--ink); }
     .admin-detect { font-family: "Space Mono", monospace; font-size: 0.78rem;
       font-weight: 700; color: var(--music); min-height: 1.1rem; }
-    .admin-check { flex-direction: row !important; align-items: center; gap: 0.5rem !important;
-      color: var(--ink) !important; text-transform: none !important; letter-spacing: 0 !important;
-      font-size: 0.9rem !important; }
-    .admin-check input { width: 22px; height: 22px; }
+    .admin-check { display: flex; align-items: center;
+      color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.9rem; }
+    .admin-check input { width: 22px; height: 22px; margin: 0 0.5rem 0 0; }
     .admin-sec { padding: 1rem 1.1rem; margin-top: 1rem; }
     .admin-sec-title { font-family: "Space Mono", monospace; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.1em; color: var(--on-accent, #fff);
       background: var(--music); border: 2px solid var(--edge); display: inline-block;
       padding: 2px 8px; margin-bottom: 0.7rem; font-size: 0.72rem; }
-    .admin-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0;
+    .admin-item { display: flex; align-items: center; padding: 0.4rem 0;
       border-top: 2px solid var(--line); }
     .admin-item:first-of-type { border-top: 0; }
-    .admin-item span { flex: 1; font-size: 0.9rem; word-break: break-word; }
+    .admin-item span { flex: 1; font-size: 0.9rem; word-break: break-word; margin-right: 0.6rem; }
     .admin-rm { flex: none; width: 34px; height: 34px; border: 3px solid var(--edge);
       background: var(--surface); font-weight: 700; font-size: 1.1rem; cursor: pointer; line-height: 1; }
     .admin-rm:active { background: var(--danger); color: #fff; }
