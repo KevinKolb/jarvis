@@ -287,10 +287,11 @@ function updateSonos() {
           if (msg) msg.textContent = sourceName();
           loading.hidden = false;
           setArtAccent(null);
-        } else {                               // nothing playing
+        } else {                               // nothing playing — keep the box visible
           lastArtUrl = "";
           art.hidden = true; art.removeAttribute("src");
-          loading.hidden = true;
+          if (msg) msg.textContent = sourceName();
+          loading.hidden = false;
           setArtAccent(null);
         }
       }
