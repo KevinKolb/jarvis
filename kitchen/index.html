@@ -22,7 +22,6 @@
     <header class="card kitchen-head" id="kitchen-hero">
       <div class="hero-status"><span id="lights-line-text">Off</span></div>
       <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</h1>
-      <div class="hero-np" id="np-line">—</div>
     </header>
 
     <!-- Lights -->
@@ -44,6 +43,14 @@
         <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle kitchen lights">
           <span class="toggle-txt">Engage</span>
         </button>
+      </div>
+    </section>
+
+    <!-- Now Playing -->
+    <section class="section theme-music" aria-label="Now playing">
+      <div class="card np-box">
+        <div class="np-status"><span id="np-line">—</span></div>
+        <img class="np-art" id="np-art" alt="Album art" hidden>
       </div>
     </section>
 

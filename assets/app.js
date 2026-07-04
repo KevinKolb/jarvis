@@ -202,6 +202,11 @@ function updateSonos() {
       sonosMuted = !!d.mute;
       npPlaying = !!d.playing;
       npTrack = d.track || "";
+      const art = document.getElementById("np-art");
+      if (art) {
+        if (d.playing && d.art) { art.src = d.art; art.hidden = false; }
+        else { art.hidden = true; art.removeAttribute("src"); }
+      }
       renderVol();
       renderNP();
     })

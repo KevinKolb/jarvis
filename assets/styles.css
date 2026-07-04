@@ -444,6 +444,26 @@ button { font: inherit; color: inherit; }
 .swatch:active { transform: translate(2px, 2px); box-shadow: none; }
 .swatch.sel { outline: 4px solid var(--ink); outline-offset: 2px; }
 
+/* ---------- Now Playing (status + album art) ---------- */
+.np-box { padding: 1rem; }
+.np-status {
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.np-art {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0.8rem;
+  border: 3px solid var(--edge);
+}
+.np-art[hidden] { display: none; }
+
 /* ---------- Music channel buttons (Radio / Jukebox / Podcasts) ---------- */
 .chan-row {
   display: flex;

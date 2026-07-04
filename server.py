@@ -331,7 +331,10 @@ class Handler(SimpleHTTPRequestHandler):
                     track = station
                 if not track:
                     track = station
-                self._json({"volume": vol, "mute": mute, "playing": playing, "track": track})
+                art = tag("upnp:albumArtURI")
+                if art.startswith("/"):
+                    art = "http://%s:1400%s" % (SONOS_IP, art)
+                self._json({"volume": vol, "mute": mute, "playing": playing, "track": track, "art": art})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
