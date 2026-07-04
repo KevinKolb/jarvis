@@ -491,6 +491,25 @@ button { font: inherit; color: inherit; }
   transition: border-color 240ms ease;
 }
 .np-art[hidden] { display: none; }
+.np-art-loading {                 /* square placeholder shown while the art loads */
+  position: relative;
+  height: 0;
+  padding-bottom: 100%;           /* 1:1 box (works on old Safari; no aspect-ratio) */
+  background: var(--surface);
+}
+.np-art-loading span {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
 /* ---------- Music channel buttons (Radio / Jukebox / Podcasts) ---------- */
 .chan-row {

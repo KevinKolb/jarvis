@@ -37,6 +37,9 @@ SONOS_ROOMS = [                            # other rooms you can share kitchen a
     ("Lounge",      "192.168.86.48"),
     ("Entryway",    "192.168.86.38"),
 ]
+# Live playback context that Sonos' metadata doesn't carry (e.g. which
+# playlist is playing — the queue only exposes the current track).
+STATE = {"playlist": ""}
 # ------------------------------------------------------------------------
 
 # Music buttons live in music.json (editable via /admin). Seeded from this
@@ -159,6 +162,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _play_favorite(self, name, shuffle=False):
         self._ensure_kitchen_grouped()
+        STATE["playlist"] = ""
         res, meta = self._find_favorite(name)
         if not res:
             raise Exception("favorite not found: %s" % name)
@@ -187,6 +191,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _play_stream(self, url, title="Stream"):
         """Play a plain internet-radio / audio stream URL directly (no service)."""
         self._ensure_kitchen_grouped()
+        STATE["playlist"] = ""
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         meta = ('<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
                 'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
@@ -213,6 +218,7 @@ class Handler(SimpleHTTPRequestHandler):
         self._ensure_kitchen_grouped()
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         title = title or "Apple Music"
+        STATE["playlist"] = title if kind in ("playlist", "libraryplaylist") else ""
         if kind == "album":
             res = "x-rincon-cpcontainer:1004206calbum%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
             item_id, cls = "1004206calbum%%3a%s" % cid, "object.container.album.musicAlbum.#AlbumView"
@@ -428,8 +434,11 @@ class Handler(SimpleHTTPRequestHandler):
                     art = html.unescape(first(r"<upnp:albumArtURI[^>]*>(.*?)</upnp:albumArtURI>", src)).strip()
                 if art.startswith("/"):
                     art = "http://%s:1400%s" % (SONOS_IP, art)
+                # show the remembered playlist name only while a queue is playing
+                cur_uri = first(r"<CurrentURI>(.*?)</CurrentURI>", mi)
+                playlist = STATE["playlist"] if (cur_uri.startswith("x-rincon-queue") and STATE["playlist"]) else ""
                 self._json({"volume": vol, "mute": mute, "playing": playing,
-                            "track": song, "station": st, "art": art})
+                            "track": song, "station": st, "playlist": playlist, "art": art})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
@@ -593,6 +602,22 @@ class Handler(SimpleHTTPRequestHandler):
                 cfg = load_music()
                 cfg.setdefault(p.get("section"), []).append(p.get("item"))
                 save_music(cfg)
+                self._json({"ok": True})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Admin: reorder a button:  POST /music/move  {"section","from","to"}
+        if self.path == "/music/move":
+            try:
+                p = json.loads(raw or b"{}")
+                section, frm, to = p.get("section"), int(p.get("from", -1)), int(p.get("to", 0))
+                cfg = load_music()
+                lst = cfg.get(section, [])
+                if 0 <= frm < len(lst):
+                    item = lst.pop(frm)
+                    lst.insert(max(0, min(len(lst), to)), item)
+                    save_music(cfg)
                 self._json({"ok": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)

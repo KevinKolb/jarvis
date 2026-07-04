@@ -171,7 +171,7 @@ const MUSIC = {
   ],
 };
 
-let sonosVol = 0, sonosMuted = false, npTrack = "", npStation = "", npPlaying = false;
+let sonosVol = 0, sonosMuted = false, npTrack = "", npStation = "", npPlaylist = "", npPlaying = false;
 let volHoldUntil = 0;   // your manual volume wins over polling until this time
 
 function renderVol() {
@@ -191,6 +191,13 @@ function renderNP() {
   if (!npPlaying) {
     line1 = "Loading...";
     line2 = vp;
+  } else if (npPlaylist) {
+    // Playlist name leads (bold, line 1); the current track sits on line 2.
+    line1 = npPlaylist;
+    const parts = [];
+    if (npTrack) parts.push(npTrack);
+    parts.push(vp);
+    line2 = parts.join(" · ");
   } else {
     // Track leads (bold, line 1). Station drops to line 2 only when a track
     // occupies line 1; otherwise the one bit we have is the bold line 1.
@@ -252,22 +259,28 @@ function updateSonos() {
       npPlaying = !!d.playing;
       npTrack = d.track || "";
       npStation = d.station || "";
+      npPlaylist = d.playlist || "";
       const art = document.getElementById("np-art");
+      const loading = document.getElementById("np-art-loading");
       if (art) {
         if (d.playing && d.art) {
           if (d.art !== lastArtUrl) {
             lastArtUrl = d.art;
-            art.src = d.art;                 // display straight from the source
             setArtAccent(null);              // gray until the new color loads
+            if (loading) loading.hidden = false;   // "LOADING ART..." placeholder
+            art.hidden = true;               // hide until the new image decodes
+            art.onload = () => { art.hidden = false; if (loading) loading.hidden = true; };
+            art.onerror = () => { if (loading) loading.hidden = true; };
+            art.src = d.art;                 // display straight from the source
             const probe = new Image();       // sample pixels via the same-origin proxy
             probe.crossOrigin = "anonymous";
             probe.onload = () => setArtAccent(extractArtColor(probe));
             probe.onerror = () => setArtAccent(null);
             probe.src = "/art?u=" + encodeURIComponent(d.art);
           }
-          art.hidden = false;
         } else if (lastArtUrl) {
-          lastArtUrl = ""; art.hidden = true; art.removeAttribute("src"); setArtAccent(null);
+          lastArtUrl = ""; art.hidden = true; art.removeAttribute("src");
+          if (loading) loading.hidden = true; setArtAccent(null);
         }
       }
       renderVol();
