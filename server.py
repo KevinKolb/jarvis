@@ -38,7 +38,7 @@ SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
 # joins it ("join", kitchen only).  A page picks its target with ?room=/…"room".
 SONOS_TARGETS = {
     "kitchen": {"ip": SONOS_IP,       "uuid": SONOS_UUID,                 "join": KITCHEN_IP},
-    "bedroom": {"ip": "192.168.86.156", "uuid": "RINCON_48A6B84B8E5401400", "join": None},
+    "bedroom": {"ip": "192.168.86.156", "uuid": "RINCON_48A6B84B8E5401400", "join": "192.168.86.43"},  # Office joins bedroom by default
 }
 # Rooms each page can share its audio to (grouped to that page's coordinator).
 ALL_ROOMS = {
@@ -379,9 +379,10 @@ class Handler(SimpleHTTPRequestHandler):
         return int(m.group(1)) if m else 30
 
     def _ensure_kitchen_grouped(self):
-        """Kitchen illusion: silently join the kitchen pair (s_join) to the room's
-        coordinator, so 'Kitchen' plays the hidden lounge speaker. No-op for rooms
-        (e.g. bedroom) that are their own coordinator (s_join is None)."""
+        """Join this room's default companion (s_join) to its coordinator on every
+        play. Kitchen: the hidden kitchen pair joins the lounge coordinator (the
+        'Kitchen' illusion). Bedroom: the Office speaker joins bedroom by default
+        (no illusion — bedroom is the real coordinator). No-op when s_join is None."""
         if not self.s_join:
             return
         try:
@@ -526,7 +527,12 @@ class Handler(SimpleHTTPRequestHandler):
                 # show the remembered playlist name only while a queue is playing
                 cur_uri = first(r"<CurrentURI>(.*?)</CurrentURI>", mi)
                 playlist = STATE["playlist"] if (cur_uri.startswith("x-rincon-queue") and STATE["playlist"]) else ""
-                self._json({"volume": vol, "mute": mute, "playing": playing,
+                # TV (HDMI/optical) input — report it plainly, no track/station/art
+                tv = cur_uri.startswith("x-sonos-htastream")
+                if tv:
+                    song, st, art, playlist = "TV playing", "", "", ""
+                    playing = True
+                self._json({"volume": vol, "mute": mute, "playing": playing, "tv": tv,
                             "track": song, "station": st, "playlist": playlist, "art": art})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
@@ -611,6 +617,21 @@ class Handler(SimpleHTTPRequestHandler):
                     '<u:SetGroupMute xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
                     '<InstanceID>0</InstanceID><DesiredMute>%d</DesiredMute></u:SetGroupMute>' % mute)
                 self._json({"ok": True, "mute": bool(mute)})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Switch this room's Sonos to its TV (HDMI/optical) input:  POST /sonos/tv
+        if self.path == "/sonos/tv":
+            try:
+                self._ensure_kitchen_grouped()   # keep Office (bedroom's default companion) in the group
+                self._sonos("AVTransport", "SetAVTransportURI",
+                    '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+                    '<CurrentURI>x-sonos-htastream:%s:spdif</CurrentURI>'
+                    '<CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
+                self._sonos("AVTransport", "Play",
+                    '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+                self._json({"ok": True, "tv": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return

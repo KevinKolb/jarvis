@@ -357,6 +357,20 @@ button { font: inherit; color: inherit; }
   color: var(--muted);
 }
 
+/* Full-width TV-mode button (bedroom Sound box) */
+.btn-tv {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 0.5rem;
+  justify-content: center;
+  text-align: center;
+  letter-spacing: 0.03em;
+}
+.btn-tv.on {                        /* TV audio is live */
+  background: var(--art-accent);
+  color: var(--art-ink);
+}
+
 /* ---------- Light tools: brightness + color ---------- */
 .light-tools {
   margin-top: 0.8rem;
@@ -511,6 +525,32 @@ button { font: inherit; color: inherit; }
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* TV graphic shown in the art area while TV audio is playing (bedroom) */
+.np-art-tv {
+  position: relative;
+  height: 0;
+  padding-bottom: 100%;             /* 1:1 box, matches the art placeholder */
+  background: var(--surface);
+  color: var(--ink);
+}
+.np-art-tv[hidden] { display: none; }
+.np-art-tv svg {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -60%);
+  width: 46%; height: 46%;
+}
+.np-art-tv span {
+  position: absolute;
+  left: 0; right: 0; bottom: 14%;
+  text-align: center;
+  font-family: "Space Mono", monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
 }

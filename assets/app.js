@@ -268,11 +268,20 @@ function updateSonos() {
       npTrack = d.track || "";
       npStation = d.station || "";
       npPlaylist = d.playlist || "";
+      const tvBtn = document.getElementById("tv-mode");   // bedroom only
+      if (tvBtn) tvBtn.classList.toggle("on", !!d.tv);
       const art = document.getElementById("np-art");
       const loading = document.getElementById("np-art-loading");
       const msg = document.getElementById("np-art-msg");
+      const tvArt = document.getElementById("np-art-tv");   // bedroom TV graphic
       const sourceName = () => npPlaylist || npStation || npTrack || "No art";
-      if (art && loading) {
+      if (tvArt) tvArt.hidden = !d.tv;
+      if (d.tv) {                              // TV audio: show the TV graphic, nothing else
+        lastArtUrl = "";
+        if (art) { art.hidden = true; art.removeAttribute("src"); }
+        if (loading) loading.hidden = true;
+        setArtAccent(null);
+      } else if (art && loading) {
         if (d.playing && d.art) {              // has artwork
           if (d.art !== lastArtUrl) {
             lastArtUrl = d.art;
@@ -398,7 +407,7 @@ function renderShare() {
           const join = !b.classList.contains("on");
           setRoom(b, rm.name, join);
           syncGroups();
-          toast(join ? "Sharing kitchen audio to " + rm.name + "." : "Stopped sharing to " + rm.name + ".");
+          toast(join ? "Sharing audio to " + rm.name + "." : "Stopped sharing to " + rm.name + ".");
         });
         roomBtns.push({ btn: b, name: rm.name });
         host.appendChild(b);
@@ -406,6 +415,16 @@ function renderShare() {
       syncGroups();
     })
     .catch(() => {});
+}
+function bindTv() {   // bedroom only: switch the room's Sonos to its TV input
+  const btn = document.getElementById("tv-mode");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    fetch("/sonos/tv", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: withRoom({}), keepalive: true }).catch(() => {});
+    toast("Switching to TV audio…");
+    window.setTimeout(updateSonos, 2000);
+  });
 }
 function renderMusic() {
   fetch("/music", { cache: "no-store" })
@@ -593,9 +612,9 @@ function paintHero(on, state) {
 
 function updateLightsStatus() {
   Promise.all([
-    fetch("/hue/groups/" + LIGHTS_GROUP, { cache: "no-store" }).then((r) => r.json()),
+    fetch("/hue/" + HUE_BRIDGE + "/groups/" + LIGHTS_GROUP, { cache: "no-store" }).then((r) => r.json()),
     ...LIGHTS_MEMBERS.map((id) =>
-      fetch("/hue/lights/" + id, { cache: "no-store" }).then((r) => r.json()).catch(() => null)
+      fetch("/hue/" + HUE_BRIDGE + "/lights/" + id, { cache: "no-store" }).then((r) => r.json()).catch(() => null)
     ),
   ])
     .then(([grp, ...lights]) => {
@@ -911,6 +930,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindVolume();
   renderMusic();
   renderShare();
+  bindTv();
   updateLightsStatus();
   updateSonos();
   window.setInterval(updateSonos, 5000);    // keep now-playing/volume fresh
