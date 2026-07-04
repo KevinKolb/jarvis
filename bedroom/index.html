@@ -17,7 +17,7 @@
 </head>
 <body>
   <main class="page" data-room="bedroom" data-sonos-room="bedroom"
-        data-hue-bridge="bedroom" data-lights-group="97" data-lights-members="43,44,47,48,49,50,53,54">
+        data-hue-bridge="bedroom" data-lights-group="99" data-lights-members="43,44,47,48,49,50,53,54">
     <!-- Bedroom header -->
     <header class="kitchen-head" id="bedroom-hero">
       <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>Bedroom</h1>
@@ -94,13 +94,20 @@
       </div>
     </section>
 
-    <!-- Link to this page -->
-    <section class="card qr" aria-label="Bedroom page address">
+    <!-- QR to this page -->
+    <section class="card qr" aria-label="Bedroom page QR code">
+      <div class="qr-frame">
+        <img class="qr-code" src="../assets/bedroom-qr.svg" width="88" height="88" alt="QR code that opens this bedroom page">
+      </div>
       <div class="qr-body">
-        <div class="qr-title">Open this page to control the bedroom</div>
-        <div class="qr-or">visit</div>
+        <div class="qr-title">Scan or print this QR code to control the bedroom</div>
+        <div class="qr-or">or visit</div>
         <span class="qr-url">192.168.86.147/bedroom</span>
         <div class="qr-wifi">must be on wifi (SpamNet)</div>
+        <button class="chip qr-print" type="button" data-print="true">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+          Print QR code
+        </button>
       </div>
     </section>
 
@@ -116,6 +123,15 @@
       <div class="conn-status"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
     </footer>
   </main>
+
+  <!-- Print-only sheet: SCAN TO CONTROL BEDROOM + QR + url -->
+  <div class="print-sheet" aria-hidden="true">
+    <div class="print-card">
+      <h1 class="print-heading">SCAN TO CONTROL BEDROOM</h1>
+      <img class="print-qr" src="../assets/bedroom-qr.svg" alt="QR code for the bedroom page">
+      <p class="print-url">192.168.86.147/bedroom</p>
+    </div>
+  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="../assets/app.js"></script>
