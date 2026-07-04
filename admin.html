@@ -105,13 +105,21 @@
       return null;
     }
     function titleFromUrl(u) {
-      const m = (u || "").match(/music\.apple\.com\/[^/]+\/(?:album|song|playlist|artist)\/([^/?]+)/i);
+      const m = (u || "").match(/music\.apple\.com\/[^/]+\/(?:album|song|playlist|artist)\/([^/?]+)/i)
+             || (u || "").match(/podcasts\.apple\.com\/[^/]+\/podcast\/([^/?]+)/i);
       if (!m) return "";
       try { return decodeURIComponent(m[1]).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
       catch (e) { return ""; }
     }
     $("a-url").addEventListener("input", () => {
-      const u = $("a-url").value; const a = parseApple(u); const det = $("a-detect");
+      const u = $("a-url").value; const det = $("a-detect");
+      if (/podcasts\.apple\.com/i.test(u)) {
+        det.textContent = "Detected: podcast — plays the newest episode";
+        $("a-section").value = "podcasts";
+        if (!$("a-label").value) $("a-label").value = titleFromUrl(u);
+        return;
+      }
+      const a = parseApple(u);
       if (a) {
         det.textContent = "Detected: " + a.kind + " · " + a.id + (a.kind === "artist" ? "  ⚠ artists can't play — use a playlist" : "");
         const t = titleFromUrl(u); if (!$("a-label").value) $("a-label").value = t;
@@ -128,8 +136,11 @@
       const label = $("a-label").value.trim() || titleFromUrl(u) || u;
       if (!u) { toast("Enter a URL or favorite name."); return; }
       const a = parseApple(u);
+      const isPodcast = /podcasts\.apple\.com/i.test(u) || (section === "podcasts" && /^https?:\/\//i.test(u));
       let item;
-      if (a) {
+      if (isPodcast) {
+        item = { label: label, podcast: u };
+      } else if (a) {
         if (a.kind === "artist") { toast("Artists can't play through Sonos — paste a playlist URL instead."); return; }
         item = { label: label, apple: { kind: a.kind, id: a.id, title: titleFromUrl(u) || label } };
       } else {
@@ -160,7 +171,7 @@
           items.forEach((it, idx) => {
             const row = document.createElement("div"); row.className = "admin-item";
             const nm = document.createElement("span");
-            nm.textContent = it.label + "  ·  " + (it.apple ? (it.apple.kind + " " + it.apple.id) : ("fav: " + it.fav)) + (it.shuffle ? "  ·  shuffle" : "");
+            nm.textContent = it.label + "  ·  " + (it.apple ? (it.apple.kind + " " + it.apple.id) : it.podcast ? "podcast" : it.url ? "url" : ("fav: " + it.fav)) + (it.shuffle ? "  ·  shuffle" : "");
             const rm = document.createElement("button"); rm.className = "admin-rm"; rm.textContent = "×"; rm.title = "Remove";
             rm.addEventListener("click", () => {
               fetch("/music/remove", { method: "POST", headers: { "Content-Type": "application/json" },

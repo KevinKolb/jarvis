@@ -318,6 +318,12 @@ function playStream(url, label) {   // direct stream URL (like Sonos "Play a URL
   toast("Playing " + label + ".");
   window.setTimeout(updateSonos, 1500);
 }
+function playPodcast(feed, label) {   // newest episode from an Apple Podcasts link / RSS feed
+  fetch("/sonos/podcast", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ feed: feed }), keepalive: true }).catch(() => {});
+  toast("Playing latest " + label + "…");
+  window.setTimeout(updateSonos, 2500);
+}
 function renderShare() {
   const host = document.getElementById("row-share");
   if (!host) return;
@@ -415,7 +421,8 @@ function renderMusicRows(M) {
         b.textContent = c.label;
         b.addEventListener("click", () => {
           markSelected(b);
-          c.url   ? playStream(c.url, c.label)
+          c.podcast ? playPodcast(c.podcast, c.label)
+          : c.url   ? playStream(c.url, c.label)
           : c.apple ? playApple(Object.assign({ shuffle: !!c.shuffle }, c.apple), c.label)
                     : playFavorite(c.fav, c.label, !!c.shuffle);
         });

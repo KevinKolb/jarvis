@@ -208,6 +208,41 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
 
+    def _resolve_feed(self, feed):
+        """Turn an Apple Podcasts link/id into its RSS feed; pass RSS URLs through."""
+        feed = (feed or "").strip()
+        if "podcasts.apple.com" in feed or feed.isdigit():
+            m = re.search(r"(\d{5,})", feed)
+            if not m:
+                raise Exception("no Apple Podcasts id in: %s" % feed)
+            look = urllib.request.Request(
+                "https://itunes.apple.com/lookup?id=%s&entity=podcast" % m.group(1),
+                headers={"User-Agent": "JARVIS"})
+            j = json.loads(urllib.request.urlopen(look, timeout=8).read().decode("utf-8", "ignore"))
+            results = j.get("results", [])
+            if results and results[0].get("feedUrl"):
+                return results[0]["feedUrl"]
+            raise Exception("could not resolve Apple Podcasts feed")
+        return feed
+
+    def _play_podcast(self, feed):
+        """Fetch a podcast RSS feed and play its newest episode as a direct stream."""
+        feed_url = self._resolve_feed(feed)
+        req = urllib.request.Request(feed_url, headers={"User-Agent": "JARVIS"})
+        xml = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", "ignore")
+        decode = lambda s: html.unescape(re.sub(r"<!\[CDATA\[|\]\]>", "", s)).strip()
+        cm = re.search(r"<title>(.*?)</title>", xml, re.S)
+        show = decode(cm.group(1)) if cm else ""
+        im = re.search(r"<item[ >].*?</item>", xml, re.S)
+        item = im.group(0) if im else ""
+        em = re.search(r'<enclosure[^>]*\burl="([^"]+)"', item)
+        if not em:
+            raise Exception("no episode audio in feed")
+        audio = html.unescape(em.group(1))
+        tm = re.search(r"<title>(.*?)</title>", item, re.S)
+        ep = decode(tm.group(1)) if tm else "Latest episode"
+        self._play_stream(audio, (show + " — " + ep) if show else ep)
+
     def _set_play_mode(self, shuffle):
         self._sonos("AVTransport", "SetPlayMode",
             '<u:SetPlayMode xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
@@ -582,6 +617,19 @@ class Handler(SimpleHTTPRequestHandler):
                 if not (url.startswith("http") or url.startswith("x-")):
                     raise Exception("bad url")
                 self._play_stream(url, p.get("title", "Stream"))
+                self._json({"ok": True})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Play a podcast's newest episode:  POST /sonos/podcast  {"feed": "<apple url / rss>"}
+        if self.path == "/sonos/podcast":
+            try:
+                p = json.loads(raw or b"{}")
+                feed = (p.get("feed") or "").strip()
+                if not feed:
+                    raise Exception("no feed")
+                self._play_podcast(feed)
                 self._json({"ok": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
