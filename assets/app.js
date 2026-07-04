@@ -766,5 +766,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderShare();
   updateLightsStatus();
   updateSonos();
-  window.setInterval(updateSonos, 10000);   // keep now-playing/volume fresh
+  window.setInterval(updateSonos, 5000);    // keep now-playing/volume fresh
 });
