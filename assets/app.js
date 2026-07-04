@@ -425,9 +425,6 @@ function nearestSwatch(state) {
 }
 // Hero reflects the ACTUAL current light (on/off + color), not the staged pick.
 function paintHero(on, state) {
-  // Colors the kitchen hero AND the Kitchen button on the home page identically.
-  const els = [document.getElementById("kitchen-hero"), document.getElementById("room-kitchen")].filter(Boolean);
-  if (!els.length) return;
   let bg, fg;
   if (on && state) {
     const sw = nearestSwatch(state);
@@ -437,7 +434,14 @@ function paintHero(on, state) {
     bg = "#000000";      // lights off -> black
     fg = "#b8b8b8";      // light gray text
   }
-  els.forEach((el) => { el.style.background = bg; el.style.color = fg; });
+  const hero = document.getElementById("kitchen-hero");   // kitchen page: tint the whole page
+  if (hero) {
+    document.body.classList.add("tinted");
+    document.body.style.background = bg;
+    hero.style.color = fg;
+  }
+  const card = document.getElementById("room-kitchen");   // home page: tint the Kitchen tile
+  if (card) { card.style.background = bg; card.style.color = fg; }
 }
 
 function updateLightsStatus() {

@@ -21,10 +21,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 BRIDGE_IP = "192.168.86.151"
 HUE_USER  = "qu7RZKY7O0HUL6vkpSnOpOXqRNKre0JzcSTf5v9a"
 PORT      = 80
-# ---- Kitchen Sonos (stereo pair; .41 = the pair's coordinator) ----------
-SONOS_IP   = "192.168.86.41"
-SONOS_UUID = "RINCON_7828CAE1ACD801400"   # coordinator (for queue playback)
-SONOS_SN    = "9"                          # Apple Music account serial on this system
+# ---- Sonos: the UI says "Kitchen", but the REAL coordinator is the LOUNGE
+#      speaker. Lounge plays; the kitchen pair is secretly grouped to it. ---
+SONOS_IP   = "192.168.86.48"                # LOUNGE — real coordinator/source
+SONOS_UUID = "RINCON_F0F6C1CF5CCA01400"     # lounge coordinator UUID
+KITCHEN_IP = "192.168.86.41"                # kitchen pair — secretly grouped to lounge
+SONOS_SN    = "9"                           # Apple Music account serial on this system
 SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
 SONOS_ROOMS = [                            # other rooms you can share kitchen audio to
     ("Living Room", "192.168.86.34"),
@@ -148,6 +150,7 @@ class Handler(SimpleHTTPRequestHandler):
         return None, None
 
     def _play_favorite(self, name, shuffle=False):
+        self._ensure_kitchen_grouped()
         res, meta = self._find_favorite(name)
         if not res:
             raise Exception("favorite not found: %s" % name)
@@ -180,6 +183,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _play_apple(self, kind, cid, title, shuffle=False):
         """Play an Apple Music album/song/playlist by its id (no favorite needed)."""
+        self._ensure_kitchen_grouped()
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         title = title or "Apple Music"
         if kind == "album":
@@ -260,6 +264,27 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", xml)
         return int(m.group(1)) if m else 30
 
+    def _ensure_kitchen_grouped(self):
+        """The illusion: silently join the kitchen pair to the lounge coordinator,
+        so 'Kitchen' plays whatever the (hidden) lounge speaker is playing."""
+        try:
+            self._avt_ip(KITCHEN_IP, "SetAVTransportURI",
+                '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+                '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % SONOS_UUID)
+        except Exception:
+            pass
+
+    def _lounge_muted(self):
+        """True if the lounge speaker is muted (used as the Lounge button's off-state)."""
+        try:
+            xml = self._rc_ip(SONOS_IP, "GetMute",
+                '<u:GetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                '<Channel>Master</Channel></u:GetMute>').decode("utf-8", "ignore")
+            m = re.search(r"<CurrentMute>(\d+)</CurrentMute>", xml)
+            return bool(m and m.group(1) == "1")
+        except Exception:
+            return False
+
     def _json(self, obj, code=200):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -339,14 +364,17 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json({"error": str(exc)}, 502)
             return
 
-        # Rooms + whether each is currently grouped to the kitchen
+        # Rooms + whether each is currently grouped to the (hidden) lounge coordinator.
+        # Lounge itself is always the coordinator, so its button tracks mute instead.
         if self.path == "/sonos/rooms":
             try:
-                kitchen_ips = set()
+                group_ips = set()
                 for coord, ips in self._zone_groups():
                     if coord == SONOS_UUID:
-                        kitchen_ips = set(ips)
-                rooms = [{"name": n, "grouped": ip in kitchen_ips} for (n, ip) in SONOS_ROOMS]
+                        group_ips = set(ips)
+                lounge_on = not self._lounge_muted()
+                rooms = [{"name": n, "grouped": (lounge_on if n == "Lounge" else ip in group_ips)}
+                         for (n, ip) in SONOS_ROOMS]
                 self._json({"rooms": rooms})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
@@ -420,7 +448,13 @@ class Handler(SimpleHTTPRequestHandler):
                 ip = dict(SONOS_ROOMS).get(room)
                 if not ip:
                     raise Exception("unknown room: %s" % room)
-                if join:
+                if room == "Lounge":
+                    # Lounge is the hidden coordinator — never ungroup it (that would
+                    # dissolve everyone's group). Toggling it just mutes/unmutes lounge.
+                    self._rc_ip(ip, "SetMute",
+                        '<u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                        '<Channel>Master</Channel><DesiredMute>%d</DesiredMute></u:SetMute>' % (0 if join else 1))
+                elif join:
                     # speakers currently in this room (before it joins the kitchen)
                     room_ips = [ip]
                     for coord, ips in self._zone_groups():
