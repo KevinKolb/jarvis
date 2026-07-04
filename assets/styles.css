@@ -466,6 +466,14 @@ button { font: inherit; color: inherit; }
   line-height: 1.4;
   color: var(--ink);
 }
+.np-primary { font-weight: 700; }         /* track (or the single bit of data) */
+.np-secondary {                           /* radio station + volume */
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+.np-secondary:empty { display: none; }
 .np-art {
   display: block;
   width: 100%;

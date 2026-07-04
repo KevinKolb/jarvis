@@ -171,7 +171,7 @@ const MUSIC = {
   ],
 };
 
-let sonosVol = 0, sonosMuted = false, npTrack = "", npPlaying = false;
+let sonosVol = 0, sonosMuted = false, npTrack = "", npStation = "", npPlaying = false;
 let volHoldUntil = 0;   // your manual volume wins over polling until this time
 
 function renderVol() {
@@ -183,12 +183,25 @@ function renderVol() {
   if (bm) bm.textContent = sonosMuted ? "Unmute" : "Mute";
 }
 function renderNP() {
-  const np = document.getElementById("np-line");
-  if (!np) return;
+  const t = document.getElementById("np-track");
+  const s = document.getElementById("np-sub");
+  if (!t || !s) return;
   const vp = sonosVol + "%";
-  if (npPlaying && npTrack) np.textContent = npTrack + " · " + vp;
-  else if (npPlaying) np.textContent = vp;
-  else np.textContent = "Loading... · " + vp;
+  let line1, line2;
+  if (!npPlaying) {
+    line1 = "Loading...";
+    line2 = vp;
+  } else {
+    // Track leads (bold, line 1). Station drops to line 2 only when a track
+    // occupies line 1; otherwise the one bit we have is the bold line 1.
+    line1 = npTrack || npStation || "Playing";
+    const parts = [];
+    if (npTrack && npStation) parts.push(npStation);
+    parts.push(vp);
+    line2 = parts.join(" · ");
+  }
+  t.textContent = line1;
+  s.textContent = line2;
 }
 function setSonosVolume(level) {
   fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -203,6 +216,7 @@ function updateSonos() {
       sonosMuted = !!d.mute;
       npPlaying = !!d.playing;
       npTrack = d.track || "";
+      npStation = d.station || "";
       const art = document.getElementById("np-art");
       if (art) {
         if (d.playing && d.art) { art.src = d.art; art.hidden = false; }

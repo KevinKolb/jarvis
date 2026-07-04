@@ -371,19 +371,15 @@ class Handler(SimpleHTTPRequestHandler):
                 st = station
                 if not st or "zpstr" in st.lower() or "buffering" in st.lower():
                     st = ""
-                # track overrides the station; show both when both exist; else whichever we have
-                if song and st:
-                    track = song + " · " + st
-                elif song:
-                    track = song
-                else:
-                    track = st
+                # song + station returned separately so the client can put them on
+                # two lines (track leads, station second)
                 art = tag("upnp:albumArtURI")
                 if not art:   # radio: logo lives in the station (media) metadata, not the track
                     art = html.unescape(first(r"<upnp:albumArtURI[^>]*>(.*?)</upnp:albumArtURI>", src)).strip()
                 if art.startswith("/"):
                     art = "http://%s:1400%s" % (SONOS_IP, art)
-                self._json({"volume": vol, "mute": mute, "playing": playing, "track": track, "art": art})
+                self._json({"volume": vol, "mute": mute, "playing": playing,
+                            "track": song, "station": st, "art": art})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
