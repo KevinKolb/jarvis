@@ -503,10 +503,13 @@ button { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0.6rem;
+  text-align: center;
+  word-break: break-word;
   font-family: "Space Mono", monospace;
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }

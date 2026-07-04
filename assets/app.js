@@ -262,25 +262,36 @@ function updateSonos() {
       npPlaylist = d.playlist || "";
       const art = document.getElementById("np-art");
       const loading = document.getElementById("np-art-loading");
-      if (art) {
-        if (d.playing && d.art) {
+      const msg = document.getElementById("np-art-msg");
+      const sourceName = () => npPlaylist || npStation || npTrack || "No art";
+      if (art && loading) {
+        if (d.playing && d.art) {              // has artwork
           if (d.art !== lastArtUrl) {
             lastArtUrl = d.art;
-            setArtAccent(null);              // gray until the new color loads
-            if (loading) loading.hidden = false;   // "LOADING ART..." placeholder
-            art.hidden = true;               // hide until the new image decodes
-            art.onload = () => { art.hidden = false; if (loading) loading.hidden = true; };
-            art.onerror = () => { if (loading) loading.hidden = true; };
-            art.src = d.art;                 // display straight from the source
-            const probe = new Image();       // sample pixels via the same-origin proxy
+            setArtAccent(null);                // gray until the new color loads
+            if (msg) msg.textContent = "Loading art…";
+            loading.hidden = false;            // placeholder while it decodes
+            art.hidden = true;
+            art.onload = () => { art.hidden = false; loading.hidden = true; };
+            art.onerror = () => { if (msg) msg.textContent = sourceName(); };
+            art.src = d.art;                   // display straight from the source
+            const probe = new Image();         // sample pixels via the same-origin proxy
             probe.crossOrigin = "anonymous";
             probe.onload = () => setArtAccent(extractArtColor(probe));
             probe.onerror = () => setArtAccent(null);
             probe.src = "/art?u=" + encodeURIComponent(d.art);
           }
-        } else if (lastArtUrl) {
-          lastArtUrl = ""; art.hidden = true; art.removeAttribute("src");
-          if (loading) loading.hidden = true; setArtAccent(null);
+        } else if (d.playing) {                // playing but no art -> show the name
+          lastArtUrl = "";
+          art.hidden = true; art.removeAttribute("src");
+          if (msg) msg.textContent = sourceName();
+          loading.hidden = false;
+          setArtAccent(null);
+        } else {                               // nothing playing
+          lastArtUrl = "";
+          art.hidden = true; art.removeAttribute("src");
+          loading.hidden = true;
+          setArtAccent(null);
         }
       }
       renderVol();
