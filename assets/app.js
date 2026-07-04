@@ -382,10 +382,12 @@ function renderShare() {
         macros.push({ btn: btn, names: names });
         host.appendChild(btn);
       }
-      if (ROOM === "kitchen") {                            // FOH/BOH are kitchen-specific
-        makeMacro("FOH", ["Lounge", "Living Room"]);      // + Kitchen (always grouped)
-        makeMacro("BOH", ["Bedroom", "Office", "Bathroom"]);
-      }
+      // FOH/BOH macros — the coordinator room is implicit, so it's left out
+      const MACROS = {
+        kitchen: [["FOH", ["Lounge", "Living Room"]], ["BOH", ["Bedroom", "Office", "Bathroom"]]],
+        bedroom: [["FOH", ["Kitchen", "Lounge", "Living Room"]], ["BOH", ["Office", "Bathroom"]]],
+      };
+      (MACROS[ROOM] || []).forEach((m) => makeMacro(m[0], m[1]));
       d.rooms.forEach((rm) => {
         const b = document.createElement("button");
         b.type = "button";
