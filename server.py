@@ -348,14 +348,24 @@ class Handler(SimpleHTTPRequestHandler):
                     return (not s) or any(x in s for x in ("http", ".mp3", "aw_0", "playerid", "listeningsession", "?", "="))
                 stream = tag("r:streamContent")
                 title, creator = tag("dc:title"), tag("dc:creator")
+                # the live song/track, if any
                 if not junk(stream):
-                    track = stream
+                    song = stream
                 elif title and not junk(title):
-                    track = (creator + " — " + title) if creator and not junk(creator) else title
+                    song = (creator + " — " + title) if creator and not junk(creator) else title
                 else:
-                    track = station
-                if not track:
-                    track = station
+                    song = ""
+                # station name (from media metadata); drop buffering placeholders
+                st = station
+                if not st or "zpstr" in st.lower() or "buffering" in st.lower():
+                    st = ""
+                # track overrides the station; show both when both exist; else whichever we have
+                if song and st:
+                    track = song + " · " + st
+                elif song:
+                    track = song
+                else:
+                    track = st
                 art = tag("upnp:albumArtURI")
                 if not art:   # radio: logo lives in the station (media) metadata, not the track
                     art = html.unescape(first(r"<upnp:albumArtURI[^>]*>(.*?)</upnp:albumArtURI>", src)).strip()
