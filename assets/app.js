@@ -395,6 +395,12 @@ function renderMusic() {
     .then((M) => renderMusicRows(M || MUSIC))
     .catch(() => renderMusicRows(MUSIC));
 }
+let selectedBtn = null;
+function markSelected(b) {   // highlight the currently-selected track/station button
+  if (selectedBtn) selectedBtn.classList.remove("sel");
+  selectedBtn = b;
+  b.classList.add("sel");
+}
 function renderMusicRows(M) {
   [["row-radio", M.radio], ["row-artists", M.artists], ["row-jukebox", M.jukebox],
    ["row-albums", M.albums], ["row-playlists", M.playlists], ["row-podcasts", M.podcasts]]
@@ -407,10 +413,12 @@ function renderMusicRows(M) {
         b.type = "button";
         b.className = "chan-btn";
         b.textContent = c.label;
-        b.addEventListener("click", () =>
+        b.addEventListener("click", () => {
+          markSelected(b);
           c.url   ? playStream(c.url, c.label)
           : c.apple ? playApple(Object.assign({ shuffle: !!c.shuffle }, c.apple), c.label)
-                    : playFavorite(c.fav, c.label, !!c.shuffle));
+                    : playFavorite(c.fav, c.label, !!c.shuffle);
+        });
         host.appendChild(b);
       });
     });

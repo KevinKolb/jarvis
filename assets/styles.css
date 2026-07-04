@@ -545,6 +545,11 @@ button { font: inherit; color: inherit; }
 }
 .chan-btn:hover { transform: translate(-2px, -2px); box-shadow: var(--sh); }
 .chan-btn:active { transform: translate(2px, 2px); box-shadow: none; background: var(--music); color: #fff; }
+.chan-btn.sel {   /* currently selected track/station -> album-art accent */
+  background: var(--art-accent);
+  color: var(--art-ink);
+  transition: background-color 240ms ease, color 240ms ease;
+}
 .share-btn.on {   /* grouped to kitchen — tint to the album-art accent */
   background: var(--art-accent);
   color: var(--art-ink);
