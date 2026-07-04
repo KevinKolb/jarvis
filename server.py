@@ -188,19 +188,20 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
 
-    def _play_stream(self, url, title="Stream"):
+    def _play_stream(self, url, title="Stream", art=""):
         """Play a plain internet-radio / audio stream URL directly (no service)."""
         self._ensure_kitchen_grouped()
         STATE["playlist"] = ""
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        art_tag = ("<upnp:albumArtURI>%s</upnp:albumArtURI>" % esc(art)) if art else ""
         meta = ('<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
                 'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
                 'xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" '
                 'xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">'
                 '<item id="-1" parentID="-1" restricted="true"><dc:title>%s</dc:title>'
-                '<upnp:class>object.item.audioItem.audioBroadcast</upnp:class>'
+                '<upnp:class>object.item.audioItem.audioBroadcast</upnp:class>%s'
                 '<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">RINCON_AssociatedZPUDN</desc>'
-                '</item></DIDL-Lite>') % esc(title)
+                '</item></DIDL-Lite>') % (esc(title), art_tag)
         self._sonos("AVTransport", "SetAVTransportURI",
             '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
             '<CurrentURI>%s</CurrentURI><CurrentURIMetaData>%s</CurrentURIMetaData></u:SetAVTransportURI>'
@@ -229,7 +230,9 @@ class Handler(SimpleHTTPRequestHandler):
         """Fetch a podcast RSS feed and play its newest episode as a direct stream."""
         feed_url = self._resolve_feed(feed)
         req = urllib.request.Request(feed_url, headers={"User-Agent": "JARVIS"})
-        xml = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", "ignore")
+        # newest episode is at the top, so read only the first couple MB — big
+        # archive feeds (hundreds of episodes) can be 10+ MB and would time out.
+        xml = urllib.request.urlopen(req, timeout=20).read(2_000_000).decode("utf-8", "ignore")
         decode = lambda s: html.unescape(re.sub(r"<!\[CDATA\[|\]\]>", "", s)).strip()
         cm = re.search(r"<title>(.*?)</title>", xml, re.S)
         show = decode(cm.group(1)) if cm else ""
@@ -241,7 +244,14 @@ class Handler(SimpleHTTPRequestHandler):
         audio = html.unescape(em.group(1))
         tm = re.search(r"<title>(.*?)</title>", item, re.S)
         ep = decode(tm.group(1)) if tm else "Latest episode"
-        self._play_stream(audio, (show + " — " + ep) if show else ep)
+        def art_of(block):
+            m = re.search(r'<itunes:image[^>]*\bhref="([^"]+)"', block)
+            if m:
+                return html.unescape(m.group(1))
+            m = re.search(r"<image>.*?<url>(.*?)</url>", block, re.S)
+            return html.unescape(m.group(1).strip()) if m else ""
+        art = art_of(item) or art_of(xml)   # episode art, else the show's cover
+        self._play_stream(audio, (show + " — " + ep) if show else ep, art)
 
     def _set_play_mode(self, shuffle):
         self._sonos("AVTransport", "SetPlayMode",
