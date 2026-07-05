@@ -7,104 +7,156 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#f4f1e6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#14140f" media="(prefers-color-scheme: dark)">
-  <title>JARVIS · Rooms</title>
-  <link rel="icon" href="/favicon.ico" sizes="any">
+  <title>House · JARVIS</title>
+  <link rel="icon" href="/house.ico" sizes="any">
   <link rel="apple-touch-icon" href="/home-touch.png">
-  <meta name="apple-mobile-web-app-title" content="Jarvis">
+  <meta name="apple-mobile-web-app-title" content="House">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
-  <main class="page page-center">
-    <p class="
-    home-wordmark">JARVIS</p>
+  <main class="page" data-room="house" data-sonos-room="house"
+        data-hue-bridge="all" data-lights-group="0" data-lights-members="22,21,20,63,62">
+    <!-- Room nav -->
+    <nav class="room-nav" aria-label="Rooms">
+      <a class="room-nav-home" href="/" aria-current="page" aria-label="Whole house"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg></a>
+      <a href="/kitchen/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</a>
+      <a href="/bedroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bedroom</a>
+      <a href="/bathroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bathroom</a>
+    </nav>
 
-    <section class="section" aria-label="Rooms">
-      <div class="room-grid">
-        <a class="room-card" id="room-kitchen" href="kitchen/">
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>
-          Kitchen
-        </a>
+    <!-- House header -->
+    <header class="kitchen-head" id="house-hero">
+      <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg>House</h1>
+    </header>
 
-        <button class="room-card" type="button" data-soon="the living room">
-          <span class="soon">Soon</span>
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M3 14a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3H3z"/><path d="M5 17v2M19 17v2"/></svg>
-          Living Room
-        </button>
+    <!-- Lights (all lights, both hubs) -->
+    <section class="section theme-lights" aria-label="Lights">
+      <div class="light-tools">
+        <div class="lights-line"><span id="lights-line-text">Off</span></div>
+        <div class="tool-row">
+          <span class="tool-label">Brightness</span>
+          <div class="bri-row">
+            <button class="bri-end bri-off" id="bri-0" type="button" aria-label="Off (0%)">0%</button>
+            <input type="range" id="brightness" class="slider" min="1" max="99" value="99" aria-label="Brightness">
+            <button class="bri-end" id="bri-100" type="button" aria-label="Brightest (100%)">100%</button>
+          </div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Color</span>
+          <div class="swatches" id="swatches" role="group" aria-label="Light color"></div>
+        </div>
 
-        <a class="room-card" id="room-bedroom" href="bedroom/">
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>
-          Bedroom
-        </a>
-
-        <button class="room-card" type="button" data-soon="the office">
-          <span class="soon">Soon</span>
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          Office
-        </button>
-
-        <button class="room-card" type="button" data-soon="the bathroom">
-          <span class="soon">Soon</span>
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>
-          Bathroom
-        </button>
-
-        <button class="room-card" type="button" data-soon="whole-house control">
-          <span class="soon">Soon</span>
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
-          Whole House
+        <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle all house lights">
+          <span class="toggle-txt">Engage</span>
         </button>
       </div>
+    </section>
 
+    <!-- Sound (Sonos) — now-playing + controls in one box -->
+    <section class="section theme-music" aria-label="Sound">
+      <div class="light-tools">
+        <div class="np-status">
+          <div class="np-primary" id="np-track">—</div>
+          <div class="np-secondary" id="np-sub"></div>
+        </div>
+        <div class="np-art-wrap">
+          <img class="np-art" id="np-art" alt="Album art" hidden>
+          <div class="np-art np-art-loading" id="np-art-loading"><span id="np-art-msg">Loading art…</span></div>
+          <div class="np-playbar">
+            <button class="np-skip np-prev" id="np-prev" type="button" aria-label="Previous track" hidden>
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6z"/><path d="M20 6v12L9 12z"/></svg>
+            </button>
+            <button class="np-playpause" id="np-playpause" type="button" aria-label="Play or pause">
+              <svg class="pp-ico pp-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+              <svg class="pp-ico pp-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="np-skip np-next" id="np-next" type="button" aria-label="Next track" hidden>
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 6v12l11-6z"/><path d="M16 6h2v12h-2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Volume</span>
+          <div class="bri-row">
+            <button class="bri-end bri-off" id="vol-mute" type="button" aria-label="Mute toggle">Mute</button>
+            <input type="range" id="volume" class="slider vol-slider" min="1" max="99" value="24" aria-label="Volume">
+            <button class="bri-end vol-max" id="vol-100" type="button" aria-label="Max (100%)">100%</button>
+          </div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Share</span>
+          <div class="chan-row" id="row-share"></div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Radio</span>
+          <div class="chan-row" id="row-radio"></div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Artists</span>
+          <div class="chan-row" id="row-artists"></div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Jukebox</span>
+          <div class="chan-row" id="row-jukebox"></div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Albums</span>
+          <div class="chan-row" id="row-albums"></div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Playlists</span>
+          <div class="chan-row" id="row-playlists"></div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Podcasts</span>
+          <div class="chan-row" id="row-podcasts"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QR to this page -->
+    <section class="card qr" aria-label="House page QR code">
+      <div class="qr-frame">
+        <img class="qr-code" src="/assets/house-qr.svg" width="88" height="88" alt="QR code that opens this house page">
+      </div>
+      <div class="qr-body">
+        <div class="qr-title">Scan or print this QR code to control the house</div>
+        <div class="qr-or">or visit</div>
+        <span class="qr-url">192.168.86.147</span>
+        <div class="qr-wifi">must be on wifi (SpamNet)</div>
+        <button class="chip qr-print" type="button" data-print="true">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+          Print QR code
+        </button>
+      </div>
+    </section>
+
+    <footer class="page-footer">
       <p class="wifi-note">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16.11a6 6 0 0 1 7 0"/><path d="M2 8.82a16 16 0 0 1 20 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
         Connect to <strong>SpamNet</strong> Wi-Fi to control the house.
       </p>
-    </section>
-
-    <details class="tech">
-      <summary>Tech Jargon</summary>
-      <div class="tech-body">
-        <h3>Network</h3>
-        <div class="kv">Wi-Fi ...... <b>SpamNet</b> (all devices must be on it)</div>
-        <div class="kv">Raspberry Pi ...... <b>192.168.86.147</b> (the web server)</div>
-        <div class="kv">Hue Bridge ...... <b>192.168.86.151</b> (kitchen = group 82)</div>
-        <div class="kv">Site ...... <b>http://192.168.86.147/</b></div>
-        <div class="kv">Kitchen ...... <b>http://192.168.86.147/kitchen/</b></div>
-
-        <h3>How it works</h3>
-        <div class="kv">The Pi runs <b>server.py</b> on port 80: it serves this website
-          and relays light commands.</div>
-        <div class="kv">Tap a light → phone POSTs to <b>/hue</b> on the Pi → Pi sends a
-          PUT to the Hue bridge. (Browsers can't call the bridge directly.)</div>
-        <div class="kv">Music buttons → <b>iOS Shortcuts</b> (Alexa has no local API).</div>
-        <div class="kv">Code lives at <b>github.com/KevinKolb/jarvis</b>. The Hue token
-          is only in server.py on the Pi, not in the public code.</div>
-
-        <h3>Update the Pi (from any computer on SpamNet)</h3>
-        <pre>ssh USERNAME@192.168.86.147
-cd jarvis
-git pull
-bash setup-pi.sh</pre>
-
-        <h3>Handy commands (run on the Pi)</h3>
-        <pre>sudo systemctl restart jarvis   # restart the server
-sudo systemctl status jarvis    # is it running?
-journalctl -u jarvis -f         # live log (Ctrl+C to quit)
-hostname -I                     # the Pi's IP address</pre>
-
-        <h3>If the lights stop working</h3>
-        <div class="kv">1. Is the phone on <b>SpamNet</b>?</div>
-        <div class="kv">2. Is the Pi powered on? (it must stay on)</div>
-        <div class="kv">3. Did the Pi's address change after a reboot? If the site won't
-          load, run <b>hostname -I</b> on the Pi to get the new address.</div>
-      </div>
-    </details>
+      <a class="backlink" href="/admin.html">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Admin
+      </a>
+      <div class="conn-status"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
+    </footer>
   </main>
 
+  <!-- Print-only sheet: SCAN TO CONTROL THE HOUSE + QR + url -->
+  <div class="print-sheet" aria-hidden="true">
+    <div class="print-card">
+      <h1 class="print-heading">SCAN TO CONTROL THE HOUSE</h1>
+      <img class="print-qr" src="/assets/house-qr.svg" alt="QR code for the house page">
+      <p class="print-url">192.168.86.147</p>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="assets/app.js"></script>
+  <script src="/assets/app.js"></script>
 </body>
 </html>

@@ -37,8 +37,10 @@ SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
 # Per-room Sonos target: coordinator ip/uuid, and a speaker that secretly
 # joins it ("join", kitchen only).  A page picks its target with ?room=/…"room".
 SONOS_TARGETS = {
+    "house":   {"ip": SONOS_IP,       "uuid": SONOS_UUID,                 "join": None},  # whole-house: music from the lounge
     "kitchen": {"ip": SONOS_IP,       "uuid": SONOS_UUID,                 "join": KITCHEN_IP},
     "bedroom": {"ip": "192.168.86.156", "uuid": "RINCON_48A6B84B8E5401400", "join": "192.168.86.43"},  # Office joins bedroom by default
+    "bathroom": {"ip": "192.168.86.159", "uuid": "RINCON_542A1BFC18E601400", "join": None},  # stereo pair (.159 primary, .63 satellite)
 }
 # Rooms each page can share its audio to (grouped to that page's coordinator).
 ALL_ROOMS = {
@@ -51,17 +53,31 @@ ALL_ROOMS = {
     "Entryway":    "192.168.86.38",
 }
 SHARE_ROOMS = {
+    # House page: lounge is the coordinator (music source), so it's left out.
+    "house": [("Kitchen", ALL_ROOMS["Kitchen"]), ("Living Room", ALL_ROOMS["Living Room"]),
+              ("Bedroom", ALL_ROOMS["Bedroom"]), ("Office", ALL_ROOMS["Office"]),
+              ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
     "kitchen": [("Lounge", ALL_ROOMS["Lounge"]), ("Living Room", ALL_ROOMS["Living Room"]),
                 ("Bedroom", ALL_ROOMS["Bedroom"]), ("Office", ALL_ROOMS["Office"]),
                 ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
+    # Office is left out on purpose: it's the bedroom's permanent companion (auto-
+    # joined on every play), not a toggle. Bedroom is always its coordinator/host.
     "bedroom": [("Kitchen", ALL_ROOMS["Kitchen"]), ("Lounge", ALL_ROOMS["Lounge"]),
-                ("Living Room", ALL_ROOMS["Living Room"]), ("Office", ALL_ROOMS["Office"]),
+                ("Living Room", ALL_ROOMS["Living Room"]),
                 ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
+    "bathroom": [("Bedroom", ALL_ROOMS["Bedroom"])],
 }
 SONOS_ROOMS = SHARE_ROOMS["kitchen"]        # back-compat alias
+# Share buttons that pull a companion speaker along, so the two move as a unit.
+# The Bedroom button carries Office (office is linked to the bedroom); grouping
+# Bedroom into another room brings Office too, and ungrouping sends Office back
+# to the bedroom's own coordinator.
+SHARE_COMPANIONS = {
+    "Bedroom": {"ips": [ALL_ROOMS["Office"]], "coord": SONOS_TARGETS["bedroom"]["uuid"]},
+}
 # Live playback context that Sonos' metadata doesn't carry (e.g. which
 # playlist is playing — the queue only exposes the current track).
-STATE = {"playlist": ""}
+STATE = {"playlist": "", "category": ""}   # category = which music row is playing (for next/back)
 # ------------------------------------------------------------------------
 
 # Music buttons live in music.json (editable via /admin). Seeded from this
@@ -352,6 +368,33 @@ class Handler(SimpleHTTPRequestHandler):
             out.append((coord, ips))
         return out
 
+    def _realign_to_coordinator(self):
+        """If this room's speaker is currently a MEMBER of another room's group
+        (e.g. it was shared into one via /sonos/group), repoint s_ip/s_uuid at
+        that group's live coordinator. Sonos rejects transport/group calls sent
+        to a non-coordinator, so without this a shared-in room's page 502s."""
+        try:
+            env = ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+                   's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
+                   '<u:GetZoneGroupState xmlns:u="urn:schemas-upnp-org:service:ZoneGroupTopology:1"></u:GetZoneGroupState>'
+                   '</s:Body></s:Envelope>')
+            req = urllib.request.Request("http://%s:1400/ZoneGroupTopology/Control" % self.s_ip, data=env.encode(),
+                headers={"Content-Type": 'text/xml; charset="utf-8"',
+                         "SOAPAction": '"urn:schemas-upnp-org:service:ZoneGroupTopology:1#GetZoneGroupState"'})
+            xml = urllib.request.urlopen(req, timeout=6).read().decode("utf-8", "ignore")
+            m = re.search(r"<ZoneGroupState>(.*?)</ZoneGroupState>", xml, re.S)
+            state = html.unescape(m.group(1)) if m else ""
+            for cm in re.finditer(r'<ZoneGroup[^>]*Coordinator="([^"]+)"[^>]*>(.*?)</ZoneGroup>', state, re.S):
+                coord, body = cm.group(1), cm.group(2)
+                members = re.findall(r'<ZoneGroupMember[^>]*UUID="([^"]+)"[^>]*Location="http://([\d.]+):1400', body)
+                if self.s_ip in [ip for (_u, ip) in members] and coord != self.s_uuid:
+                    cip = next((ip for (u, ip) in members if u == coord), None)
+                    if cip:
+                        self.s_ip, self.s_uuid = cip, coord
+                    return
+        except Exception:
+            pass
+
     def _avt_ip(self, ip, action, inner):
         """AVTransport SOAP to a specific speaker IP (used for grouping)."""
         env = ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
@@ -462,6 +505,7 @@ class Handler(SimpleHTTPRequestHandler):
         # Combined state: volume, mute, and what's playing (as specific as possible)
         if sp == "/sonos/state":
             try:
+                self._realign_to_coordinator()   # keep working if this room is shared into a group
                 vx = self._sonos("GroupRenderingControl", "GetGroupVolume",
                     '<u:GetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1"><InstanceID>0</InstanceID></u:GetGroupVolume>')
                 mx = self._sonos("GroupRenderingControl", "GetGroupMute",
@@ -532,8 +576,10 @@ class Handler(SimpleHTTPRequestHandler):
                 if tv:
                     song, st, art, playlist = "TV playing", "", "", ""
                     playing = True
+                category = "" if tv else STATE.get("category", "")
                 self._json({"volume": vol, "mute": mute, "playing": playing, "tv": tv,
-                            "track": song, "station": st, "playlist": playlist, "art": art})
+                            "track": song, "station": st, "playlist": playlist,
+                            "art": art, "category": category})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
@@ -612,11 +658,40 @@ class Handler(SimpleHTTPRequestHandler):
         # Mute / unmute:  POST /sonos/mute  {"mute": true|false}
         if self.path == "/sonos/mute":
             try:
+                self._realign_to_coordinator()   # shared-in rooms: mute the group's coordinator
                 mute = 1 if json.loads(raw or b"{}").get("mute") else 0
                 self._sonos("GroupRenderingControl", "SetGroupMute",
                     '<u:SetGroupMute xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
                     '<InstanceID>0</InstanceID><DesiredMute>%d</DesiredMute></u:SetGroupMute>' % mute)
                 self._json({"ok": True, "mute": bool(mute)})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Skip to next / previous track (queue content only):  POST /sonos/next | /sonos/prev
+        if self.path in ("/sonos/next", "/sonos/prev"):
+            try:
+                self._realign_to_coordinator()
+                action = "Next" if self.path.endswith("next") else "Previous"
+                self._sonos("AVTransport", action,
+                    '<u:%s xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:%s>' % (action, action))
+                self._json({"ok": True})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Play / pause the current track:  POST /sonos/transport  {"action":"play"|"pause"}
+        if self.path == "/sonos/transport":
+            try:
+                self._realign_to_coordinator()   # act on the group's coordinator when shared in
+                act = (json.loads(raw or b"{}").get("action") or "play").lower()
+                if act == "pause":
+                    self._sonos("AVTransport", "Pause",
+                        '<u:Pause xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:Pause>')
+                else:
+                    self._sonos("AVTransport", "Play",
+                        '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+                self._json({"ok": True, "action": act})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
@@ -651,16 +726,20 @@ class Handler(SimpleHTTPRequestHandler):
                         '<u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
                         '<Channel>Master</Channel><DesiredMute>%d</DesiredMute></u:SetMute>' % (0 if join else 1))
                 elif join:
-                    # speakers currently in this room (before it joins this coordinator)
-                    room_ips = [ip]
+                    comp = SHARE_COMPANIONS.get(room, {})
+                    join_ips = [ip] + [c for c in comp.get("ips", []) if c != ip]
+                    # speakers currently in these rooms (before they join this coordinator)
+                    room_ips = list(join_ips)
                     for coord, ips in self._zone_groups():
-                        if ip in ips:
-                            room_ips = ips
-                            break
-                    self._avt_ip(ip, "SetAVTransportURI",
-                        '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
-                        '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
-                    # pop the added room to the kitchen volume (then group volume keeps them together)
+                        if any(j in ips for j in join_ips):
+                            for m in ips:
+                                if m not in room_ips:
+                                    room_ips.append(m)
+                    for jip in join_ips:
+                        self._avt_ip(jip, "SetAVTransportURI",
+                            '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+                            '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
+                    # pop the added rooms to this room's volume (then group volume keeps them together)
                     kvol = self._kitchen_volume()
                     for rip in room_ips:
                         try:
@@ -670,8 +749,20 @@ class Handler(SimpleHTTPRequestHandler):
                         except Exception:
                             pass
                 else:
+                    comp = SHARE_COMPANIONS.get(room, {})
                     self._avt_ip(ip, "BecomeCoordinatorOfStandaloneGroup",
                         '<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:BecomeCoordinatorOfStandaloneGroup>')
+                    # companion(s) rejoin the primary room's own coordinator, so they
+                    # stay paired (e.g. Office follows the Bedroom back out)
+                    for cip in comp.get("ips", []):
+                        if cip == ip:
+                            continue
+                        try:
+                            self._avt_ip(cip, "SetAVTransportURI",
+                                '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+                                '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % comp.get("coord", self.s_uuid))
+                        except Exception:
+                            pass
                 self._json({"ok": True, "room": room, "grouped": join})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
@@ -681,6 +772,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/sonos/favorite":
             try:
                 p = json.loads(raw or b"{}")
+                STATE["category"] = p.get("category", "")
                 name = p.get("name", "")
                 self._play_favorite(name, bool(p.get("shuffle")))
                 self._json({"ok": True, "name": name})
@@ -693,6 +785,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/sonos/uri":
             try:
                 p = json.loads(raw or b"{}")
+                STATE["category"] = p.get("category", "")
                 url = (p.get("url") or "").strip()
                 if not (url.startswith("http") or url.startswith("x-")):
                     raise Exception("bad url")
@@ -706,6 +799,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/sonos/podcast":
             try:
                 p = json.loads(raw or b"{}")
+                STATE["category"] = p.get("category", "")
                 feed = (p.get("feed") or "").strip()
                 if not feed:
                     raise Exception("no feed")
@@ -719,6 +813,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/sonos/apple":
             try:
                 p = json.loads(raw or b"{}")
+                STATE["category"] = p.get("category", "")
                 self._play_apple(p.get("kind", "song"), str(p.get("id", "")), p.get("title", ""), bool(p.get("shuffle")))
                 self._json({"ok": True})
             except Exception as exc:

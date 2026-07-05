@@ -371,6 +371,53 @@ button { font: inherit; color: inherit; }
   color: var(--art-ink);
 }
 
+/* Hub-wide "FOH OFF" / "BOH OFF" button under Engage */
+.btn-house-off {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 0.6rem;
+  justify-content: center;
+  text-align: center;
+  letter-spacing: 0.06em;
+  background: #363636;
+  color: #ffffff;
+}
+
+/* Compact room nav across the top of each room page */
+.room-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.room-nav::-webkit-scrollbar { display: none; }
+.room-nav a {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.62rem;
+  border: 2px solid var(--edge);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-sm);
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+.room-nav a svg { width: 15px; height: 15px; flex: none; }
+.room-nav-home { padding: 0.4rem 0.5rem; }
+.room-nav a[aria-current="page"] {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+}
+
 /* ---------- Light tools: brightness + color ---------- */
 .light-tools {
   margin-top: 0.8rem;
@@ -497,6 +544,39 @@ button { font: inherit; color: inherit; }
   margin-top: 0.2rem;
 }
 .np-secondary:empty { display: none; }
+.np-art-wrap { position: relative; margin-top: 0.8rem; }
+.np-art-wrap .np-art { margin-top: 0; }
+/* Transport controls layered over the bottom fifth of the album art */
+.np-playbar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 20%;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8%;
+  background: var(--art-accent-soft, rgba(154, 154, 154, 0.34));
+  transition: background-color 240ms ease;
+}
+.np-playbar button {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+  border: none;
+  background: none;
+  color: var(--art-ink);
+  cursor: pointer;
+}
+.np-playbar[hidden] { display: none; }
+.np-playbar button svg { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
+.np-playpause .pp-ico { width: 30px; height: 30px; }
+.np-skip svg { width: 24px; height: 24px; }
+.np-skip[hidden] { display: none; }
+.np-playpause .pp-play { display: none; }
+.np-playpause.paused .pp-play { display: block; }
+.np-playpause.paused .pp-pause { display: none; }
 .np-art {
   display: block;
   width: 100%;
@@ -590,6 +670,16 @@ button { font: inherit; color: inherit; }
   background: var(--art-accent);
   color: var(--art-ink);
   transition: background-color 240ms ease, color 240ms ease;
+}
+.share-btn { text-transform: uppercase; }
+.share-note {
+  margin-top: 0.55rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .share-btn.on {   /* grouped to kitchen — tint to the album-art accent */
   background: var(--art-accent);

@@ -20,10 +20,14 @@ scp -q -r \
   "$DIR/admin.html" \
   "$DIR/kitchen" \
   "$DIR/bedroom" \
+  "$DIR/bathroom" \
   "$DIR/assets" \
   "$DIR/server.py" \
   "$DIR/favicon.ico" \
+  "$DIR/house.ico" \
   "$DIR/kitchen.ico" \
+  "$DIR/bedroom.ico" \
+  "$DIR/bathroom.ico" \
   "$DIR/home-touch.png" \
   "$DIR/kitchen-touch.png" \
   "$DIR/setup-pi.sh" \

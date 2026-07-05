@@ -94,25 +94,32 @@ function runFetch(req) {
 
 /* ---------- Ask the Pi relay to talk to the Hue bridge ---------- */
 function runHueProxy(hue) {
-  fetch("/hue", {                       // same-origin: the Pi, not the bridge
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(Object.assign({ bridge: HUE_BRIDGE }, hue)),
-    keepalive: true,
-  }).catch(() => { /* relay unreachable — Pi off, or not on SpamNet */ });
+  HUE_WRITE.forEach((bridge) => {       // "all" = send to both hubs
+    fetch("/hue", {                     // same-origin: the Pi, not the bridge
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ bridge: bridge }, hue)),
+      keepalive: true,
+    }).catch(() => { /* relay unreachable — Pi off, or not on SpamNet */ });
+  });
 }
 
 /* ---------- Per-room config (set by data-* on .page) ---------- */
 const PAGE = document.querySelector(".page") || document.body;
 const CFG = PAGE.dataset || {};
 const ROOM = CFG.sonosRoom || "kitchen";                 // Sonos target room
-const HUE_BRIDGE = CFG.hueBridge || "main";              // which Hue bridge
+const ROOM_LABEL = (CFG.room || ROOM).replace(/^\w/, (c) => c.toUpperCase());  // "Bathroom"
+const HUE_BRIDGE = CFG.hueBridge || "main";              // which Hue bridge ("all" = both)
+const HUE_ALL_BRIDGES = ["main", "bedroom"];
+const HUE_WRITE = HUE_BRIDGE === "all" ? HUE_ALL_BRIDGES : [HUE_BRIDGE];        // bridges to command
+const HUE_READ = HUE_BRIDGE === "all" ? HUE_ALL_BRIDGES : [HUE_BRIDGE];         // bridges to read status from
 const RQ = "?page=" + encodeURIComponent(ROOM);          // GET query for sonos
-const withRoom = (o) => JSON.stringify(Object.assign({ page: ROOM }, o));  // POST body
+let npCategory = "";                                      // music row now playing (drives next/back)
+const withRoom = (o) => JSON.stringify(Object.assign({ page: ROOM, category: npCategory }, o));  // POST body
 
 /* ---------- Read + show current light status ---------- */
 const LIGHTS_GROUP = CFG.lightsGroup || "82";            // Hue group id
-const LIGHTS_MEMBERS = (CFG.lightsMembers || "22,21,20,63,62").split(",");  // bulbs (true color)
+const LIGHTS_MEMBERS = (CFG.lightsMembers || "22,21,20,63,62").split(",").filter(Boolean);  // bulbs (true color)
 let lightsOn = null;         // true / false / null (unknown)
 let pendingColor = null;     // { body, css } current color selection (default white)
 let pendingBri = 254;        // current brightness selection (default 100%)
@@ -196,8 +203,9 @@ function renderNP() {
   if (!t || !s) return;
   const vp = sonosVol + "%";
   let line1, line2;
-  if (!npPlaying) {
-    line1 = "Loading...";
+  if (!npPlaylist && !npTrack && !npStation) {
+    // genuinely nothing loaded
+    line1 = npPlaying ? "Playing" : "Loading...";
     line2 = vp;
   } else if (npPlaylist) {
     // Playlist name leads (bold, line 1); the current track sits on line 2.
@@ -256,6 +264,8 @@ function setArtAccent(color) {
   const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   root.setProperty("--art-ink", lum > 0.62 ? "#111111" : "#ffffff");
+  // mostly-transparent tint of the border color for the play/pause strip
+  root.setProperty("--art-accent-soft", "rgba(" + r + "," + g + "," + b + ",0.34)");
 }
 function updateSonos() {
   fetch("/sonos/state" + RQ, { cache: "no-store" })
@@ -270,6 +280,11 @@ function updateSonos() {
       npPlaylist = d.playlist || "";
       const tvBtn = document.getElementById("tv-mode");   // bedroom only
       if (tvBtn) tvBtn.classList.toggle("on", !!d.tv);
+      if (!npCategory && d.category) npCategory = d.category;   // restore on fresh load
+      updatePlayPause();
+      updateSkip();
+      const playbar = document.querySelector(".np-playbar");    // no transport controls in TV mode
+      if (playbar) playbar.hidden = !!d.tv;
       const art = document.getElementById("np-art");
       const loading = document.getElementById("np-art-loading");
       const msg = document.getElementById("np-art-msg");
@@ -282,7 +297,7 @@ function updateSonos() {
         if (loading) loading.hidden = true;
         setArtAccent(null);
       } else if (art && loading) {
-        if (d.playing && d.art) {              // has artwork
+        if (d.art) {                           // has artwork (kept while paused, not just playing)
           if (d.art !== lastArtUrl) {
             lastArtUrl = d.art;
             setArtAccent(null);                // gray until the new color loads
@@ -298,13 +313,7 @@ function updateSonos() {
             probe.onerror = () => setArtAccent(null);
             probe.src = "/art?u=" + encodeURIComponent(d.art);
           }
-        } else if (d.playing) {                // playing but no art -> show the name
-          lastArtUrl = "";
-          art.hidden = true; art.removeAttribute("src");
-          if (msg) msg.textContent = sourceName();
-          loading.hidden = false;
-          setArtAccent(null);
-        } else {                               // nothing playing — keep the box visible
+        } else {                               // no art -> show the track / source name
           lastArtUrl = "";
           art.hidden = true; art.removeAttribute("src");
           if (msg) msg.textContent = sourceName();
@@ -367,7 +376,7 @@ function renderShare() {
       const all = document.createElement("button");
       all.type = "button";
       all.className = "chan-btn share-btn share-all";
-      all.textContent = "All";
+      all.textContent = "House";
       all.addEventListener("click", () => {
         const join = roomBtns.some((x) => !x.btn.classList.contains("on"));   // any off -> turn all on
         roomBtns.forEach((x) => setRoom(x.btn, x.name, join));
@@ -393,9 +402,13 @@ function renderShare() {
       }
       // FOH/BOH macros — the coordinator room is implicit, so it's left out
       const MACROS = {
+        house: [["FOH", ["Kitchen", "Living Room"]], ["BOH", ["Bedroom", "Office", "Bathroom"]], ["ENTRYWAY", ["Entryway"]]],
         kitchen: [["FOH", ["Lounge", "Living Room"]], ["BOH", ["Bedroom", "Office", "Bathroom"]]],
-        bedroom: [["FOH", ["Kitchen", "Lounge", "Living Room"]], ["BOH", ["Office", "Bathroom"]]],
+        bedroom: [["BATH", ["Bathroom"]]],
+        bathroom: [["BOH", ["Bedroom"]]],
       };
+      // Pages that show only All + macros (no individual room buttons)
+      const MACROS_ONLY = { house: true, bathroom: true, bedroom: true };
       (MACROS[ROOM] || []).forEach((m) => makeMacro(m[0], m[1]));
       d.rooms.forEach((rm) => {
         const b = document.createElement("button");
@@ -410,11 +423,50 @@ function renderShare() {
           toast(join ? "Sharing audio to " + rm.name + "." : "Stopped sharing to " + rm.name + ".");
         });
         roomBtns.push({ btn: b, name: rm.name });
+        if (MACROS_ONLY[ROOM]) return;   // hidden button still drives macros/All
         host.appendChild(b);
       });
       syncGroups();
     })
     .catch(() => {});
+}
+// Play/pause toggle layered on the album art. Shows a pause icon while playing
+// (tap to pause) and a play icon while paused (tap to resume).
+function updatePlayPause() {
+  const btn = document.getElementById("np-playpause");
+  if (btn) btn.classList.toggle("paused", !npPlaying);
+}
+// Next/back only make sense for queue content: playlists, artists, albums.
+function updateSkip() {
+  const on = npCategory === "playlists" || npCategory === "artists" || npCategory === "albums";
+  ["np-prev", "np-next"].forEach((id) => {
+    const b = document.getElementById(id);
+    if (b) b.hidden = !on;
+  });
+}
+function bindPlayPause() {
+  const btn = document.getElementById("np-playpause");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const action = npPlaying ? "pause" : "play";
+    fetch("/sonos/transport", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: withRoom({ action: action }), keepalive: true }).catch(() => {});
+    npPlaying = !npPlaying;          // optimistic; the next poll confirms
+    updatePlayPause();
+    toast(action === "pause" ? "Paused." : "Playing.");
+    window.setTimeout(updateSonos, 800);
+  });
+}
+function bindSkip() {
+  [["np-prev", "/sonos/prev"], ["np-next", "/sonos/next"]].forEach(([id, path]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.addEventListener("click", () => {
+      fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: withRoom({}), keepalive: true }).catch(() => {});
+      window.setTimeout(updateSonos, 700);
+    });
+  });
 }
 function bindTv() {   // bedroom only: switch the room's Sonos to its TV input
   const btn = document.getElementById("tv-mode");
@@ -444,6 +496,7 @@ function renderMusicRows(M) {
     .forEach(([id, list]) => {
       const host = document.getElementById(id);
       if (!host || !list) return;
+      const category = id.replace("row-", "");   // "albums", "playlists", "artists", …
       host.innerHTML = "";
       list.forEach((c) => {
         const b = document.createElement("button");
@@ -452,6 +505,8 @@ function renderMusicRows(M) {
         b.textContent = c.label;
         b.addEventListener("click", () => {
           markSelected(b);
+          npCategory = category;      // sent with the play POST; drives next/back visibility
+          updateSkip();
           c.podcast ? playPodcast(c.podcast, c.label)
           : c.url   ? playStream(c.url, c.label)
           : c.apple ? playApple(Object.assign({ shuffle: !!c.shuffle }, c.apple), c.label)
@@ -486,7 +541,7 @@ function bindVolume() {
   });
 }
 
-// Real "Kitchen · online/offline" indicator, based on bridge reachability.
+// Real online/offline indicator, based on Hue bridge reachability.
 function setConn(online) {
   const state = online ? "online" : "offline";
   const txt = document.getElementById("conn-text");
@@ -610,35 +665,111 @@ function paintHero(on, state) {
   if (card) { card.style.background = bg; card.style.color = fg; }
 }
 
+function bridgeList(bridge) {
+  if (Array.isArray(bridge)) return bridge;
+  return bridge === "all" ? HUE_ALL_BRIDGES : [bridge || "main"];
+}
+function hueGet(bridge, path) {
+  return fetch("/hue/" + bridge + path, { cache: "no-store" }).then((r) => {
+    if (!r.ok) throw new Error("Hue " + bridge + " " + path + " " + r.status);
+    return r.json();
+  });
+}
+function hueLightsList(data) {
+  return Object.keys(data || {}).map((id) => data[id]).filter(Boolean);
+}
+function readHueBridgeStatus(bridge, group, members) {
+  const memberIds = members || [];
+  const lightsReq = memberIds.length
+    ? Promise.all(memberIds.map((id) => hueGet(bridge, "/lights/" + id).catch(() => null)))
+    : hueGet(bridge, "/lights").then(hueLightsList).catch(() => []);
+
+  return Promise.all([hueGet(bridge, "/groups/" + group), lightsReq])
+    .then(([grp, lights]) => ({ bridge: bridge, grp: grp, lights: lights.filter(Boolean), ok: true }))
+    .catch(() => ({ bridge: bridge, grp: null, lights: [], ok: false }));
+}
+function readHueStatus(bridge, group, members) {
+  const bridges = bridgeList(bridge);
+  const all = bridge === "all" || bridges.length > 1;
+  const ids = (members || []).filter(Boolean);
+  return Promise.all(bridges.map((b) => readHueBridgeStatus(b, group, all ? [] : ids)));
+}
+function summarizeHueStatus(results) {
+  const online = results.filter((r) => r.ok);
+  const groups = online.map((r) => r.grp).filter(Boolean);
+  const lights = online.reduce((acc, r) => acc.concat(r.lights), []);
+  const on = groups.some((grp) => !!(grp && grp.state && grp.state.any_on));
+  const onLights = lights.filter((l) => l && l.state && l.state.on && l.state.reachable);
+  const rep = onLights.find((l) => l.state.colormode !== "ct" && (l.state.sat || 0) >= 20)
+    || onLights[0]
+    || lights.find((l) => l && l.state);
+  const lstate = rep ? rep.state : {};
+  const action = groups.map((grp) => grp && grp.action).find((a) => a && typeof a.bri === "number");
+  const bri = typeof lstate.bri === "number" ? lstate.bri : (action ? action.bri : null);
+  return {
+    online: online.length > 0,
+    complete: online.length === results.length,
+    on: on,
+    state: lstate,
+    bri: bri,
+  };
+}
+
+// Home page: tint each room tile with its OWN room's live light color.
+// Config (bridge / group / member bulbs) rides on each tile's data-* attrs.
+function tintRoomCard(card) {
+  const bridge = card.dataset.hueBridge || "main";
+  const group = card.dataset.lightsGroup;
+  if (!group) return;
+  const members = (card.dataset.lightsMembers || "").split(",").filter(Boolean);
+  readHueStatus(bridge, group, members)
+    .then((results) => {
+      const status = summarizeHueStatus(results);
+      if (!status.online) return;
+      let bg, fg;
+      if (status.on) { const sw = nearestSwatch(status.state); bg = sw.css; fg = textColorFor(sw.css); }
+      else { bg = "#000000"; fg = "#b8b8b8"; }
+      card.style.background = bg;
+      card.style.color = fg;
+    })
+    .catch(() => {});
+}
+// Light config per room page, keyed by its URL — used to tint the top room-nav
+// pills with each room's own live light color (same as the home tiles).
+const ROOM_LIGHTS = {
+  "/kitchen/":  { bridge: "main",    group: "82", members: "22,21,20,63,62" },
+  "/bedroom/":  { bridge: "bedroom", group: "99", members: "43,44,47,48,49,50,53,54" },
+  "/bathroom/": { bridge: "bedroom", group: "88", members: "22,24,20,21,34,35" },
+};
+function initNavLights() {   // stamp each nav pill with its room's light config
+  document.querySelectorAll(".room-nav a[href]").forEach((a) => {
+    const cfg = ROOM_LIGHTS[a.getAttribute("href")];
+    if (!cfg) return;
+    a.dataset.hueBridge = cfg.bridge;
+    a.dataset.lightsGroup = cfg.group;
+    a.dataset.lightsMembers = cfg.members;
+  });
+}
+function tintHomeCards() {   // home tiles + room-nav pills: each tinted by its room
+  document.querySelectorAll(".room-card[data-lights-group], .room-nav a[data-lights-group]")
+    .forEach(tintRoomCard);
+}
+
 function updateLightsStatus() {
-  Promise.all([
-    fetch("/hue/" + HUE_BRIDGE + "/groups/" + LIGHTS_GROUP, { cache: "no-store" }).then((r) => r.json()),
-    ...LIGHTS_MEMBERS.map((id) =>
-      fetch("/hue/" + HUE_BRIDGE + "/lights/" + id, { cache: "no-store" }).then((r) => r.json()).catch(() => null)
-    ),
-  ])
-    .then(([grp, ...lights]) => {
-      setConn(true);
-      const gstate = (grp && grp.state) || {};
-      const on = !!gstate.any_on;
-      // representative on-bulb for color: prefer one that's actually colored
-      const onLights = lights.filter((l) => l && l.state && l.state.on && l.state.reachable);
-      const rep = onLights.find((l) => l.state.colormode !== "ct" && (l.state.sat || 0) >= 20)
-        || onLights[0]
-        || lights.find((l) => l && l.state);
-      const lstate = rep ? rep.state : {};
-      const bri = typeof lstate.bri === "number"
-        ? lstate.bri
-        : (grp && grp.action ? grp.action.bri : null);
-      lightsOn = on;
+  readHueStatus(HUE_READ, LIGHTS_GROUP, LIGHTS_MEMBERS)
+    .then((results) => {
+      const status = summarizeHueStatus(results);
+      if (!status.online) throw new Error("Hue offline");
+      setConn(status.complete);
+      lightsOn = status.on;
       const text = document.getElementById("lights-line-text");
-      if (on) {
-        const pct = typeof bri === "number" ? Math.round((bri / 254) * 100) : null;
+      if (status.on) {
+        const pct = typeof status.bri === "number" ? Math.round((status.bri / 254) * 100) : null;
         if (text) text.textContent = "Lights on" + (pct != null ? " " + pct + "%" : "");
       } else if (text) {
         text.textContent = "Lights off";
       }
-      paintHero(on, lstate);
+      paintHero(status.on, status.state);
       updateToggle();
     })
     .catch(() => {
@@ -708,12 +839,12 @@ function bindLightsToggle() {
   if (!btn) return;
   btn.addEventListener("click", () => {
     const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
-    if (isOff || (lightsOn && !dirty)) {
-      // black or 0% selected, or on with nothing newly selected -> turn off
-      runAction("Kitchen Lights Off");
+    if (isOff) {
+      // the chosen setting is itself "off" (black or 0%) -> apply off
+      runHue({ on: false });                // this room's group, on this room's bridge
       resetLightControls();
       lightsOn = false;
-      toast("The kitchen lights are off.");
+      toast("The " + ROOM_LABEL + " lights are off.");
     } else {
       // enact the current selection (turn on / update in place); keep selection
       const body = pendingColor && pendingColor.body ? Object.assign({}, pendingColor.body) : { on: true };
@@ -725,6 +856,21 @@ function bindLightsToggle() {
     }
     updateToggle();
     window.setTimeout(updateLightsStatus, 500);          // confirm from bridge
+  });
+}
+
+// Turn off EVERY light on this room's Hue hub. main hub = Front of House,
+// bedroom hub = Back of House. Group 0 is the bridge's built-in "all lights".
+function bindHouseOff() {
+  const btn = document.getElementById("house-off");
+  if (!btn) return;
+  const foh = HUE_BRIDGE === "main";
+  const label = foh ? "FOH OFF" : "BOH OFF";
+  btn.textContent = label;
+  btn.addEventListener("click", () => {
+    runHueProxy({ path: "/groups/0/action", body: { on: false } });
+    toast((foh ? "Front" : "Back") + " of house lights off.");
+    window.setTimeout(updateLightsStatus, 500);
   });
 }
 
@@ -925,13 +1071,22 @@ document.addEventListener("DOMContentLoaded", () => {
   bindPrint();
   bindSoonRooms();
   bindLightsToggle();
+  bindHouseOff();
   bindLightTools();
   resetLightControls();     // default selection: white + 100%
   bindVolume();
   renderMusic();
   renderShare();
   bindTv();
-  updateLightsStatus();
+  bindPlayPause();
+  bindSkip();
+  if (!document.querySelector(".room-grid")) {
+    updateLightsStatus();      // room page: its own lights section + hero tint
+  }
+  initNavLights();             // give the top nav pills their room light configs
+  tintHomeCards();             // tint home tiles AND room-nav pills by room light color
+  window.setInterval(tintHomeCards, 10000);
+  window.addEventListener("visibilitychange", () => { if (!document.hidden) tintHomeCards(); });
   updateSonos();
   window.setInterval(updateSonos, 5000);    // keep now-playing/volume fresh
 });
