@@ -363,6 +363,17 @@ function renderShare() {
     .then((d) => {
       if (!d || !d.rooms) return;
       host.innerHTML = "";
+      // Permanent host indicator: a dummy, always-selected first button (e.g. Bedroom/Office)
+      const DUMMY_FIRST = { bedroom: "Bed/Office" };
+      if (DUMMY_FIRST[ROOM]) {
+        const d0 = document.createElement("button");
+        d0.type = "button";
+        d0.className = "chan-btn share-btn on";
+        d0.textContent = DUMMY_FIRST[ROOM];
+        d0.setAttribute("aria-disabled", "true");
+        d0.addEventListener("click", () => toast("Office always plays with the Bedroom."));
+        host.appendChild(d0);
+      }
       const roomBtns = [];
       const macros = [];
       // keep All + each macro lit only when all of their rooms are on
@@ -373,6 +384,8 @@ function renderShare() {
           m.btn.classList.toggle("on", targets.length > 0 && targets.every((x) => x.btn.classList.contains("on")));
         });
       };
+      // Pages that don't show the whole-House (All) share button
+      const NO_HOUSE_BTN = { bedroom: true };
       const all = document.createElement("button");
       all.type = "button";
       all.className = "chan-btn share-btn share-all";
@@ -383,7 +396,7 @@ function renderShare() {
         syncGroups();
         toast(join ? "Sharing to all rooms." : "Stopped sharing to all rooms.");
       });
-      host.appendChild(all);
+      if (!NO_HOUSE_BTN[ROOM]) host.appendChild(all);   // still built (syncGroups uses it), just not shown
       // FOH / BOH: toggle a fixed subset of rooms at once
       function makeMacro(label, names) {
         const btn = document.createElement("button");
@@ -468,6 +481,36 @@ function bindSkip() {
     });
   });
 }
+// Mouse drag-to-scroll for the horizontal button rows (desktop has no touch
+// swipe and the scrollbar is hidden). A real click still fires; a drag doesn't.
+function enableDragScroll(el) {
+  let down = false, startX = 0, startLeft = 0, moved = false;
+  el.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    down = true; moved = false;
+    startX = e.pageX; startLeft = el.scrollLeft;
+    el.classList.add("dragging");
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!down) return;
+    const dx = e.pageX - startX;
+    if (Math.abs(dx) > 4) moved = true;
+    el.scrollLeft = startLeft - dx;
+  });
+  window.addEventListener("mouseup", () => {
+    if (!down) return;
+    down = false;
+    el.classList.remove("dragging");
+    if (moved) {                       // swallow the click that follows a real drag
+      const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      el.addEventListener("click", swallow, true);
+      window.setTimeout(() => el.removeEventListener("click", swallow, true), 0);
+    }
+  });
+}
+function bindDragScroll() {
+  document.querySelectorAll(".chan-row, .room-nav").forEach(enableDragScroll);
+}
 function bindTv() {   // bedroom only: switch the room's Sonos to its TV input
   const btn = document.getElementById("tv-mode");
   if (!btn) return;
@@ -537,7 +580,7 @@ function bindVolume() {
     sonosMuted = !sonosMuted;
     renderVol(); renderNP();
     fetch("/sonos/mute", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mute: sonosMuted }), keepalive: true }).catch(() => {});
+      body: withRoom({ mute: sonosMuted }), keepalive: true }).catch(() => {});
   });
 }
 
@@ -802,6 +845,7 @@ function resetLightControls() {
   const out = document.getElementById("bri-val");
   if (slider) slider.value = 99;
   if (out) out.textContent = "100%";
+  updateBriBubble();
   selectSwatch(document.querySelector('#swatches .swatch[data-name="White"]'));
   setTrackColor(white.css);
   updateToggle();
@@ -873,8 +917,35 @@ function bindHouseOff() {
     window.setTimeout(updateLightsStatus, 500);
   });
 }
+// Turn off EVERY light in the house (both Hue hubs), from any room page.
+function bindHouseOffAll() {
+  const btn = document.getElementById("house-off-all");
+  if (!btn) return;
+  btn.textContent = "HOUSE OFF";
+  btn.addEventListener("click", () => {
+    HUE_ALL_BRIDGES.forEach((bridge) => {
+      fetch("/hue", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bridge: bridge, path: "/groups/0/action", body: { on: false } }),
+        keepalive: true }).catch(() => {});
+    });
+    toast("All house lights off.");
+    window.setTimeout(updateLightsStatus, 500);
+  });
+}
 
 /* ---------- Brightness slider + ROYGBIV color swatches ---------- */
+// Position the % bubble over the brightness slider's thumb (bedroom only).
+function updateBriBubble() {
+  const slider = document.getElementById("brightness");
+  const bubble = document.getElementById("bri-bubble");
+  if (!slider || !bubble) return;
+  const min = Number(slider.min), max = Number(slider.max), val = Number(slider.value);
+  const frac = max > min ? (val - min) / (max - min) : 0;
+  const thumb = 18;                                   // matches .slider thumb width
+  const x = slider.offsetLeft + thumb / 2 + frac * (slider.offsetWidth - thumb);
+  bubble.style.left = x + "px";
+  bubble.textContent = (val >= max ? 100 : val) + "%";
+}
 function bindLightTools() {
   const swatches = document.getElementById("swatches");
   if (swatches) {
@@ -904,6 +975,7 @@ function bindLightTools() {
     slider.addEventListener("input", () => {
       const pct = Number(slider.value);            // 1..99
       if (out) out.textContent = pct + "%";
+      updateBriBubble();
       pendingBri = Math.round((pct / 100) * 254);
       dirty = true;
       updateToggle();
@@ -919,8 +991,12 @@ function bindLightTools() {
   if (b100) b100.addEventListener("click", () => {
     pendingBri = 254; dirty = true;
     if (out) out.textContent = "100%";
+    if (slider) slider.value = slider.max;
+    updateBriBubble();
     updateToggle();
   });
+  updateBriBubble();
+  window.addEventListener("resize", updateBriBubble);
 }
 
 /* ---------- Decide how an action runs ---------- */
@@ -1072,6 +1148,8 @@ document.addEventListener("DOMContentLoaded", () => {
   bindSoonRooms();
   bindLightsToggle();
   bindHouseOff();
+  bindHouseOffAll();
+  bindDragScroll();
   bindLightTools();
   resetLightControls();     // default selection: white + 100%
   bindVolume();

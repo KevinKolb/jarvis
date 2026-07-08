@@ -26,7 +26,6 @@ scp -q -r \
   "$DIR/favicon.ico" \
   "$DIR/house.ico" \
   "$DIR/kitchen.ico" \
-  "$DIR/bedroom.ico" \
   "$DIR/bathroom.ico" \
   "$DIR/home-touch.png" \
   "$DIR/kitchen-touch.png" \

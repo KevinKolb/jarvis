@@ -14,6 +14,7 @@ import html
 import json
 import os
 import re
+import time
 import urllib.request
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -214,6 +215,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _play_favorite(self, name, shuffle=False):
         self._ensure_kitchen_grouped()
+        vol = self._hold_begin()            # mute + hold volume across the source change
         STATE["playlist"] = ""
         res, meta = self._find_favorite(name)
         if not res:
@@ -239,10 +241,12 @@ class Handler(SimpleHTTPRequestHandler):
             self._set_play_mode(shuffle)
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+        self._hold_end(vol)
 
     def _play_stream(self, url, title="Stream", art=""):
         """Play a plain internet-radio / audio stream URL directly (no service)."""
         self._ensure_kitchen_grouped()
+        vol = self._hold_begin()            # mute + hold volume across the source change
         STATE["playlist"] = ""
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         art_tag = ("<upnp:albumArtURI>%s</upnp:albumArtURI>" % esc(art)) if art else ""
@@ -260,6 +264,7 @@ class Handler(SimpleHTTPRequestHandler):
             % (esc(url), esc(meta)))
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+        self._hold_end(vol)
 
     def _resolve_feed(self, feed):
         """Turn an Apple Podcasts link/id into its RSS feed; pass RSS URLs through."""
@@ -313,6 +318,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _play_apple(self, kind, cid, title, shuffle=False):
         """Play an Apple Music album/song/playlist by its id (no favorite needed)."""
         self._ensure_kitchen_grouped()
+        vol = self._hold_begin()            # mute + hold volume across the source change
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         title = title or "Apple Music"
         STATE["playlist"] = title if kind in ("playlist", "libraryplaylist") else ""
@@ -349,6 +355,7 @@ class Handler(SimpleHTTPRequestHandler):
         self._set_play_mode(shuffle)
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+        self._hold_end(vol)
 
     def _zone_groups(self):
         """Return [(coordinator_uuid, [member_ips])] from the Sonos topology."""
@@ -420,6 +427,64 @@ class Handler(SimpleHTTPRequestHandler):
             '<u:GetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1"><InstanceID>0</InstanceID></u:GetGroupVolume>')
         m = re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", xml)
         return int(m.group(1)) if m else 30
+
+    def _group_volume(self):
+        """Current group volume (0-100), or None if it can't be read."""
+        try:
+            xml = self._sonos("GroupRenderingControl", "GetGroupVolume",
+                '<u:GetGroupVolume xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1"><InstanceID>0</InstanceID></u:GetGroupVolume>')
+            m = re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", xml)
+            return int(m.group(1)) if m else None
+        except Exception:
+            return None
+
+    def _restore_volume(self, vol):
+        """Force every speaker in this room's group back to `vol`. Switching source
+        (esp. to/from the TV input) makes Sonos jump to a per-source remembered
+        level; capturing before and restoring after keeps the volume steady."""
+        if not vol:
+            return
+        ips = [self.s_ip]
+        for coord, member_ips in self._zone_groups():
+            if coord == self.s_uuid and member_ips:
+                ips = member_ips
+                break
+        for ip in ips:
+            try:
+                self._rc_ip(ip, "SetVolume",
+                    '<u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                    '<Channel>Master</Channel><DesiredVolume>%d</DesiredVolume></u:SetVolume>' % vol)
+            except Exception:
+                pass
+
+    def _mute_group(self, muted):
+        """Mute/unmute every speaker in this room's group."""
+        m = 1 if muted else 0
+        ips = [self.s_ip]
+        for coord, member_ips in self._zone_groups():
+            if coord == self.s_uuid and member_ips:
+                ips = member_ips
+                break
+        for ip in ips:
+            try:
+                self._rc_ip(ip, "SetMute",
+                    '<u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                    '<Channel>Master</Channel><DesiredMute>%d</DesiredMute></u:SetMute>' % m)
+            except Exception:
+                pass
+
+    def _hold_begin(self):
+        """Capture the group volume and MUTE, to hide the volume burst Sonos makes
+        when it recalls a per-source level on a source change. Pair with _hold_end."""
+        vol = self._group_volume()
+        self._mute_group(True)
+        return vol
+
+    def _hold_end(self, vol):
+        """Let Sonos settle its recalled volume, force the held level back, unmute."""
+        time.sleep(0.35)
+        self._restore_volume(vol)
+        self._mute_group(False)
 
     def _ensure_kitchen_grouped(self):
         """Join this room's default companion (s_join) to its coordinator on every
@@ -660,9 +725,27 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 self._realign_to_coordinator()   # shared-in rooms: mute the group's coordinator
                 mute = 1 if json.loads(raw or b"{}").get("mute") else 0
-                self._sonos("GroupRenderingControl", "SetGroupMute",
-                    '<u:SetGroupMute xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
-                    '<InstanceID>0</InstanceID><DesiredMute>%d</DesiredMute></u:SetGroupMute>' % mute)
+                # group mute keeps GetGroupMute (the state read) correct
+                try:
+                    self._sonos("GroupRenderingControl", "SetGroupMute",
+                        '<u:SetGroupMute xmlns:u="urn:schemas-upnp-org:service:GroupRenderingControl:1">'
+                        '<InstanceID>0</InstanceID><DesiredMute>%d</DesiredMute></u:SetGroupMute>' % mute)
+                except Exception:
+                    pass
+                # also mute each speaker directly — the TV (home-theater) input
+                # ignores group mute, so per-speaker mute is what actually silences it
+                ips = [self.s_ip]
+                for coord, member_ips in self._zone_groups():
+                    if coord == self.s_uuid and member_ips:
+                        ips = member_ips
+                        break
+                for ip in ips:
+                    try:
+                        self._rc_ip(ip, "SetMute",
+                            '<u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                            '<Channel>Master</Channel><DesiredMute>%d</DesiredMute></u:SetMute>' % mute)
+                    except Exception:
+                        pass
                 self._json({"ok": True, "mute": bool(mute)})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
@@ -699,13 +782,16 @@ class Handler(SimpleHTTPRequestHandler):
         # Switch this room's Sonos to its TV (HDMI/optical) input:  POST /sonos/tv
         if self.path == "/sonos/tv":
             try:
-                self._ensure_kitchen_grouped()   # keep Office (bedroom's default companion) in the group
+                vol = self._hold_begin()         # mute + hold volume (TV input jumps to its own level)
                 self._sonos("AVTransport", "SetAVTransportURI",
                     '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
                     '<CurrentURI>x-sonos-htastream:%s:spdif</CurrentURI>'
                     '<CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
                 self._sonos("AVTransport", "Play",
                     '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
+                # join Office AFTER the TV input is live, so it follows the TV audio
+                self._ensure_kitchen_grouped()   # Office = bedroom's default companion
+                self._hold_end(vol)
                 self._json({"ok": True, "tv": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)

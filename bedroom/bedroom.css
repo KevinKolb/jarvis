@@ -1,0 +1,113 @@
+/* =========================================================
+   Bedroom — "Sunset Motel" theme (exclusive to this page).
+   Loaded after assets/styles.css, so it overrides the shared
+   brutalist look for the bedroom only.
+
+   Softer + warmer than the rest of the app: rounded corners,
+   ambient shadows (no hard offset blocks), dusk palette.
+
+   IMPORTANT — left untouched on purpose (dynamic colors):
+     • the page/hero tint set by the LIGHTS  (inline on <body>)
+     • the room-nav pill tint set by each room's lights
+     • the album-art accent  (--art-accent / --art-ink /
+       --art-accent-soft)  → art border, playbar, share "on",
+       volume track, etc.
+     • the ROYGBIV light swatches
+   Only static "chrome" (surfaces, buttons, borders, text) is themed.
+   ========================================================= */
+
+:root {
+  --paper:   #1b1410;   /* warm near-black brown (page fallback) */
+  --surface: #2c221b;   /* cards / control boxes */
+  --ink:     #f3e7d6;   /* warm cream text */
+  --muted:   #ac9585;   /* dusty tan */
+  --edge:    #4c3b31;   /* soft brown border (was hard black) */
+
+  /* dusk accents: muted coral for LIGHTS, dusty teal for MUSIC */
+  --lights:  #f0916f;
+  --music:   #5aa99f;
+
+  /* ambient shadows instead of hard offset blocks */
+  --sh:    0 8px 22px rgba(0, 0, 0, 0.42);
+  --sh-lg: 0 12px 30px rgba(0, 0, 0, 0.50);
+  --sh-sm: 0 4px 12px rgba(0, 0, 0, 0.34);
+
+  color-scheme: dark;   /* the bedroom stays in its warm dark theme */
+}
+
+/* ---------- soften the brutalist shapes ---------- */
+
+.light-tools,
+.card,
+.qr { border-width: 1.5px; border-radius: 18px; }
+
+/* big buttons (Engage, hub-off, TV mode) */
+.btn { border-width: 1.5px; border-radius: 14px; }
+.btn:hover  { transform: translateY(-2px); box-shadow: var(--sh-lg); }
+.btn:active { transform: translateY(1px);  box-shadow: var(--sh-sm); }
+
+/* warm the neutral "off" states (they were cold grays) */
+.btn-toggle[data-state="off"] { background: #3a2b23; color: #f3e7d6; }
+.btn-house-off { background: #3a2b23; color: #f3e7d6; }
+.btn-house-off-all { background: #2a1f19; }
+
+/* pill-shaped channel + share buttons */
+.chan-btn { border-width: 1.5px; border-radius: 999px; }
+.chan-btn:hover  { transform: translateY(-2px); box-shadow: var(--sh); }
+.chan-btn:active { transform: translateY(1px); }
+
+/* volume / brightness end caps */
+.bri-end { border-width: 1.5px; border-radius: 11px; }
+
+/* top room-nav pills (their light-color tint is inline, so only shape changes) */
+.room-nav a { border-width: 1.5px; border-radius: 12px; }
+
+/* album-art area: round the corners, thin the frame — color stays --art-accent */
+.np-art,
+.np-art-loading,
+.np-art-tv { border-radius: 14px; }
+.np-art { border-width: 2px; }
+.np-playbar { border-radius: 0 0 12px 12px; }   /* bg stays --art-accent-soft */
+
+/* the SpamNet note in the footer */
+.wifi-note { border-width: 1.5px; border-radius: 14px; }
+
+/* softer, warmer hero title */
+.kitchen-title { letter-spacing: 0.01em; }
+
+/* ---------- Lights split into three boxes ---------- */
+
+/* live brightness % bubble riding the slider thumb */
+.slider-wrap { position: relative; flex: 1 1 0; min-width: 0; margin: 0 0.5rem; display: flex; align-items: center; }
+.slider-wrap .slider { flex: 1 1 0; min-width: 0; margin: 0; }
+.slider-bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;                       /* JS sets the real left as the thumb moves */
+  transform: translateX(-50%);
+  margin-bottom: 9px;
+  padding: 3px 8px;
+  background: var(--accent);
+  color: var(--on-accent, #141410);
+  font-family: "Space Mono", monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--sh-sm);
+}
+.slider-bubble::after {              /* little pointer under the bubble */
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--accent);
+}
+
+/* the two OFF buttons sit side by side, 50/50 */
+.off-row { display: flex; gap: 0.6rem; }
+.off-row .btn-house-off { flex: 1 1 0; width: auto; min-width: 0; margin-top: 0; }

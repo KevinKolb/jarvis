@@ -8,12 +8,13 @@
   <meta name="theme-color" content="#f4f1e6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#14140f" media="(prefers-color-scheme: dark)">
   <title>Bedroom · JARVIS</title>
-  <link rel="icon" href="/bedroom.ico" sizes="any">
+  <link rel="icon" href="/bedroom/bedroom.ico" sizes="any">
   <meta name="apple-mobile-web-app-title" content="Bedroom">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/styles.css">
+  <link rel="stylesheet" href="/bedroom/bedroom.css">
 </head>
 <body>
   <main class="page" data-room="bedroom" data-sonos-room="bedroom"
@@ -22,39 +23,14 @@
     <nav class="room-nav" aria-label="Rooms">
       <a class="room-nav-home" href="/" aria-label="All rooms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg></a>
       <a href="/kitchen/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</a>
-      <a href="/bedroom/" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bedroom</a>
-      <a href="/bathroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bathroom</a>
+      <a href="/bedroom/" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bed</a>
+      <a href="/bathroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bath</a>
     </nav>
 
     <!-- Bedroom header -->
     <header class="kitchen-head" id="bedroom-hero">
       <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>Bedroom</h1>
     </header>
-
-    <!-- Lights -->
-    <section class="section theme-lights" aria-label="Lights">
-      <div class="light-tools">
-        <div class="lights-line"><span id="lights-line-text">Off</span></div>
-        <div class="tool-row">
-          <span class="tool-label">Brightness</span>
-          <div class="bri-row">
-            <button class="bri-end bri-off" id="bri-0" type="button" aria-label="Off (0%)">0%</button>
-            <input type="range" id="brightness" class="slider" min="1" max="99" value="99" aria-label="Brightness">
-            <button class="bri-end" id="bri-100" type="button" aria-label="Brightest (100%)">100%</button>
-          </div>
-        </div>
-        <div class="tool-row">
-          <span class="tool-label">Color</span>
-          <div class="swatches" id="swatches" role="group" aria-label="Light color"></div>
-        </div>
-
-        <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle bedroom lights">
-          <span class="toggle-txt">Engage</span>
-        </button>
-
-        <button class="btn btn-house-off" id="house-off" type="button" aria-label="Turn off all lights on this hub"></button>
-      </div>
-    </section>
 
     <!-- Sound (Sonos) — now-playing + controls in one box -->
     <section class="section theme-music" aria-label="Sound">
@@ -94,7 +70,6 @@
         <div class="tool-row">
           <span class="tool-label">Share</span>
           <div class="chan-row" id="row-share"></div>
-          <div class="share-note">Office always plays with the Bedroom — the Bedroom is the host.</div>
         </div>
         <div class="tool-row">
           <span class="tool-label">TV</span>
@@ -126,6 +101,44 @@
         <div class="tool-row">
           <span class="tool-label">Podcasts</span>
           <div class="chan-row" id="row-podcasts"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lights -->
+    <section class="section theme-lights" aria-label="Lights">
+      <!-- Brightness -->
+      <div class="light-tools">
+        <div class="lights-line"><span id="lights-line-text">Off</span></div>
+        <div class="tool-row">
+          <span class="tool-label">Brightness</span>
+          <div class="bri-row">
+            <button class="bri-end bri-off" id="bri-0" type="button" aria-label="Off (0%)">0%</button>
+            <div class="slider-wrap">
+              <output class="slider-bubble" id="bri-bubble" for="brightness">100%</output>
+              <input type="range" id="brightness" class="slider" min="1" max="99" value="99" aria-label="Brightness">
+            </div>
+            <button class="bri-end" id="bri-100" type="button" aria-label="Brightest (100%)">100%</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Color + Engage -->
+      <div class="light-tools">
+        <div class="tool-row">
+          <span class="tool-label">Color</span>
+          <div class="swatches" id="swatches" role="group" aria-label="Light color"></div>
+        </div>
+        <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle bedroom lights">
+          <span class="toggle-txt">Engage</span>
+        </button>
+      </div>
+
+      <!-- Off: this hub / whole house (side by side) -->
+      <div class="light-tools">
+        <div class="off-row">
+          <button class="btn btn-house-off" id="house-off" type="button" aria-label="Turn off all lights on this hub"></button>
+          <button class="btn btn-house-off btn-house-off-all" id="house-off-all" type="button" aria-label="Turn off every light in the house">HOUSE OFF</button>
         </div>
       </div>
     </section>

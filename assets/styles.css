@@ -648,6 +648,9 @@ button { font: inherit; color: inherit; }
 }
 .chan-row::-webkit-scrollbar { display: none; }   /* WebKit: hide scrollbar */
 .chan-row:last-child { margin-bottom: 0; }
+/* Desktop mouse drag-to-scroll (touch swipe still works on mobile) */
+.chan-row, .room-nav { cursor: grab; }
+.chan-row.dragging, .room-nav.dragging { cursor: grabbing; -webkit-user-select: none; user-select: none; }
 .chan-btn {
   -webkit-appearance: none;
   appearance: none;
@@ -697,6 +700,7 @@ button { font: inherit; color: inherit; }
 }
 .page-footer > * { margin: 0 0 0.85rem; }
 .page-footer > *:last-child { margin-bottom: 0; }
+.page-footer .wifi-note { margin: 0 0 1rem; }   /* override .wifi-note's own margin in the footer */
 .conn-status {
   display: inline-flex;
   align-items: center;
