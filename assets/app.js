@@ -121,9 +121,14 @@ const withRoom = (o) => JSON.stringify(Object.assign({ page: ROOM, category: npC
 const LIGHTS_GROUP = CFG.lightsGroup || "82";            // Hue group id
 const LIGHTS_MEMBERS = (CFG.lightsMembers || "22,21,20,63,62").split(",").filter(Boolean);  // bulbs (true color)
 let lightsOn = null;         // true / false / null (unknown)
+let lightsBri = null;        // current on-brightness as 0-100 %, or null
+let lightsColor = null;      // current light color mapped to a swatch name, or null
+let lightHeroBg = "#8a8a8a"; // current light color css (for the header on the Lights deck)
 let pendingColor = null;     // { body, css } current color selection (default white)
 let pendingBri = 254;        // current brightness selection (default 100%)
+let pendingBriVis = 1;       // display-only shade for that selection (0-1)
 let selectedSwatchEl = null; // currently highlighted swatch
+let selectedBriEl = null;    // currently highlighted brightness box
 let dirty = false;           // selection changed since last engage / load?
 
 function selectSwatch(el) {
@@ -136,11 +141,30 @@ function selectSwatch(el) {
 function runHue(body) {
   runHueProxy({ path: "/groups/" + LIGHTS_GROUP + "/action", body: body });
 }
+// Send a state change to specific lights (used to skip a light the group hits).
+function runHueLights(ids, body) {
+  ids.forEach((id) => runHueProxy({ path: "/lights/" + id + "/state", body: body }));
+}
+// The office/desk lamp is dimmable-only (no color). It joins group commands
+// normally — white scenes and every OFF button hit the whole group — EXCEPT
+// when a colored (hue) scene is engaged: then the office lamp is turned OFF
+// (it can't show the color) and only the color-capable members get the scene.
+const OFFICE_LAMP = CFG.officeLamp || "";
+function applyLights(body) {
+  const colored = body && Object.prototype.hasOwnProperty.call(body, "hue");
+  if (OFFICE_LAMP && colored) {
+    runHueLights([OFFICE_LAMP], { on: false });   // colored scene starts by turning it off
+    const colorMembers = LIGHTS_MEMBERS.filter((id) => id !== OFFICE_LAMP);
+    if (colorMembers.length) runHueLights(colorMembers, body);
+  } else {
+    runHue(body);   // white / brightness-only / off -> whole group (incl. office lamp)
+  }
+}
 
-// Black (= off) + White + ROYGBV. `css` is the swatch color; `body` is sent
-// to the bridge. White uses color temperature; colors use Hue's hue wheel.
+// White + ROYGBV. `css` is the swatch color; `body` is sent to the bridge.
+// White uses color temperature; colors use Hue's hue wheel. (No "off" swatch —
+// the OFF buttons handle turning lights off.)
 const COLORS = [
-  { name: "Black",  css: "#000000", off: true },
   { name: "White",  css: "#ffffff", body: { on: true, sat: 0, ct: 250 } },
   { name: "Red",    css: "#e53935", body: { on: true, hue: 0,     sat: 254 } },
   { name: "Orange", css: "#fb8c00", body: { on: true, hue: 4500,  sat: 254 } },
@@ -164,8 +188,10 @@ const MUSIC = {
   ],
   artists: [
     { label: "Warren Zevon", fav: "Warren Zevon" },
+    { label: "Hootie and the Blowfish", fav: "Hootie and the Blowfish" },
   ],
   jukebox: [
+    { label: "Junebug!", apple: { kind: "song", id: "6783079574", title: "Junebug" } },
     { label: "Foot of Canal St", fav: "Foot of Canal Street" },
     { label: "Sledgehammer", apple: { kind: "song", id: "987872731", title: "Sledgehammer" } },
   ],
@@ -196,35 +222,36 @@ function renderVol() {
   if (s && sonosVol >= 1 && sonosVol <= 99) s.value = sonosVol;
   const bm = document.getElementById("vol-mute");
   if (bm) bm.textContent = sonosMuted ? "Unmute" : "Mute";
+  renderVolBoxes();     // the volume column beside the album art
+  updateHeroStatus();   // header shows the volume % on the Music deck
 }
 function renderNP() {
   const t = document.getElementById("np-track");
   const s = document.getElementById("np-sub");
   if (!t || !s) return;
-  const vp = sonosVol + "%";
   let line1, line2;
   if (!npPlaylist && !npTrack && !npStation) {
     // genuinely nothing loaded
     line1 = npPlaying ? "Playing" : "Loading...";
-    line2 = vp;
+    line2 = "";
   } else if (npPlaylist) {
     // Playlist name leads (bold, line 1); the current track sits on line 2.
     line1 = npPlaylist;
-    const parts = [];
-    if (npTrack) parts.push(npTrack);
-    parts.push(vp);
-    line2 = parts.join(" · ");
+    line2 = npTrack || "";
   } else {
     // Track leads (bold, line 1). Station drops to line 2 only when a track
     // occupies line 1; otherwise the one bit we have is the bold line 1.
     line1 = npTrack || npStation || "Playing";
-    const parts = [];
-    if (npTrack && npStation) parts.push(npStation);
-    parts.push(vp);
-    line2 = parts.join(" · ");
+    line2 = (npTrack && npStation) ? npStation : "";
   }
   t.textContent = line1;
   s.textContent = line2;
+  // last line: which row this was played from, e.g. "FROM ALBUMS"
+  const c = document.getElementById("np-cat");
+  if (c) {
+    const playing = npPlaying || npPlaylist || npTrack || npStation;
+    c.textContent = (playing && npCategory) ? "FROM " + npCategory.toUpperCase() : "";
+  }
 }
 function setSonosVolume(level) {
   fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -266,6 +293,7 @@ function setArtAccent(color) {
   root.setProperty("--art-ink", lum > 0.62 ? "#111111" : "#ffffff");
   // mostly-transparent tint of the border color for the play/pause strip
   root.setProperty("--art-accent-soft", "rgba(" + r + "," + g + "," + b + ",0.34)");
+  if (typeof updateHeaderColor === "function") updateHeaderColor();   // Music header follows art
 }
 function updateSonos() {
   fetch("/sonos/state" + RQ, { cache: "no-store" })
@@ -295,7 +323,7 @@ function updateSonos() {
         lastArtUrl = "";
         if (art) { art.hidden = true; art.removeAttribute("src"); }
         if (loading) loading.hidden = true;
-        setArtAccent(null);
+        setArtAccent(lightHeroBg);   // TV has no art -> use the room's current hue light color
       } else if (art && loading) {
         if (d.art) {                           // has artwork (kept while paused, not just playing)
           if (d.art !== lastArtUrl) {
@@ -329,25 +357,25 @@ function updateSonos() {
 function playFavorite(fav, label, shuffle) {
   fetch("/sonos/favorite", { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ name: fav, shuffle: !!shuffle }), keepalive: true }).catch(() => {});
-  toast("Playing " + label + ".");
+  toast("Now playing " + label);
   window.setTimeout(updateSonos, 1500);
 }
 function playApple(apple, label) {   // apple = {kind, id, title}
   fetch("/sonos/apple", { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom(apple), keepalive: true }).catch(() => {});
-  toast("Playing " + label + ".");
+  toast("Now playing " + label);
   window.setTimeout(updateSonos, 1500);
 }
 function playStream(url, label) {   // direct stream URL (like Sonos "Play a URL")
   fetch("/sonos/uri", { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ url: url, title: label }), keepalive: true }).catch(() => {});
-  toast("Playing " + label + ".");
+  toast("Now playing " + label);
   window.setTimeout(updateSonos, 1500);
 }
 function playPodcast(feed, label) {   // newest episode from an Apple Podcasts link / RSS feed
   fetch("/sonos/podcast", { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ feed: feed }), keepalive: true }).catch(() => {});
-  toast("Playing latest " + label + "…");
+  toast("Now playing latest " + label);
   window.setTimeout(updateSonos, 2500);
 }
 function renderShare() {
@@ -364,14 +392,14 @@ function renderShare() {
       if (!d || !d.rooms) return;
       host.innerHTML = "";
       // Permanent host indicator: a dummy, always-selected first button (e.g. Bedroom/Office)
-      const DUMMY_FIRST = { bedroom: "Bed/Office" };
+      const DUMMY_FIRST = { bedroom: "Bedroom/Office" };
       if (DUMMY_FIRST[ROOM]) {
         const d0 = document.createElement("button");
         d0.type = "button";
         d0.className = "chan-btn share-btn on";
         d0.textContent = DUMMY_FIRST[ROOM];
         d0.setAttribute("aria-disabled", "true");
-        d0.addEventListener("click", () => toast("Office always plays with the Bedroom."));
+        d0.addEventListener("click", () => toast("Bedroom shared to Office."));
         host.appendChild(d0);
       }
       const roomBtns = [];
@@ -396,9 +424,11 @@ function renderShare() {
         syncGroups();
         toast(join ? "Sharing to all rooms." : "Stopped sharing to all rooms.");
       });
-      if (!NO_HOUSE_BTN[ROOM]) host.appendChild(all);   // still built (syncGroups uses it), just not shown
+      // The "House" share button is removed everywhere. `all` is still built
+      // because syncGroups() references it; it's just never added to the DOM.
       // FOH / BOH: toggle a fixed subset of rooms at once
-      function makeMacro(label, names) {
+      function makeMacro(label, names, toastName) {
+        const nm = toastName || label;              // friendly name for the toast
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "chan-btn share-btn share-all";
@@ -408,21 +438,21 @@ function renderShare() {
           const join = targets.some((x) => !x.btn.classList.contains("on"));
           targets.forEach((x) => setRoom(x.btn, x.name, join));
           syncGroups();
-          toast(join ? "Sharing to " + label + "." : "Stopped " + label + " sharing.");
+          toast(join ? "Playing in " + nm + " too." : "Stopped playing in " + nm + ".");
         });
         macros.push({ btn: btn, names: names });
         host.appendChild(btn);
       }
-      // FOH/BOH macros — the coordinator room is implicit, so it's left out
+      // FOH/BOH macros — coordinator room implicit. 3rd item = friendly toast name.
       const MACROS = {
         house: [["FOH", ["Kitchen", "Living Room"]], ["BOH", ["Bedroom", "Office", "Bathroom"]], ["ENTRYWAY", ["Entryway"]]],
         kitchen: [["FOH", ["Lounge", "Living Room"]], ["BOH", ["Bedroom", "Office", "Bathroom"]]],
-        bedroom: [["BATH", ["Bathroom"]]],
+        bedroom: [["ADD BATH", ["Bathroom"], "Bath"]],
         bathroom: [["BOH", ["Bedroom"]]],
       };
       // Pages that show only All + macros (no individual room buttons)
       const MACROS_ONLY = { house: true, bathroom: true, bedroom: true };
-      (MACROS[ROOM] || []).forEach((m) => makeMacro(m[0], m[1]));
+      (MACROS[ROOM] || []).forEach((m) => makeMacro(m[0], m[1], m[2]));
       d.rooms.forEach((rm) => {
         const b = document.createElement("button");
         b.type = "button";
@@ -433,7 +463,7 @@ function renderShare() {
           const join = !b.classList.contains("on");
           setRoom(b, rm.name, join);
           syncGroups();
-          toast(join ? "Sharing audio to " + rm.name + "." : "Stopped sharing to " + rm.name + ".");
+          toast(join ? "Playing in " + rm.name + " too." : "Stopped playing in " + rm.name + ".");
         });
         roomBtns.push({ btn: b, name: rm.name });
         if (MACROS_ONLY[ROOM]) return;   // hidden button still drives macros/All
@@ -450,8 +480,15 @@ function updatePlayPause() {
   if (btn) btn.classList.toggle("paused", !npPlaying);
 }
 // Next/back only make sense for queue content: playlists, artists, albums.
+// The category can be lost (e.g. a server restart clears STATE), so also show
+// skip whenever a queue-like track is playing — a track with no radio station.
 function updateSkip() {
-  const on = npCategory === "playlists" || npCategory === "artists" || npCategory === "albums";
+  const SKIPPABLE = ["playlists", "artists", "albums"];   // multi-track queues
+  const NO_SKIP = ["radio", "jukebox", "podcasts", "share"];   // single item -> play/pause only
+  let on;
+  if (SKIPPABLE.indexOf(npCategory) !== -1) on = true;
+  else if (NO_SKIP.indexOf(npCategory) !== -1) on = false;
+  else on = !!npTrack && !npStation;   // category lost (e.g. server restart) -> infer from queue-like content
   ["np-prev", "np-next"].forEach((id) => {
     const b = document.getElementById(id);
     if (b) b.hidden = !on;
@@ -466,7 +503,7 @@ function bindPlayPause() {
       body: withRoom({ action: action }), keepalive: true }).catch(() => {});
     npPlaying = !npPlaying;          // optimistic; the next poll confirms
     updatePlayPause();
-    toast(action === "pause" ? "Paused." : "Playing.");
+    toast(action === "pause" ? "Paused" : "Playing");
     window.setTimeout(updateSonos, 800);
   });
 }
@@ -584,6 +621,61 @@ function bindVolume() {
   });
 }
 
+/* ---------- Volume as a column of preset boxes (0% = MUTE) ---------- */
+const VOL_PRESETS = [100, 75, 50, 25, 10, 5, 0];   // top -> bottom
+
+function sendMute(on) {
+  fetch("/sonos/mute", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: withRoom({ mute: !!on }), keepalive: true }).catch(() => {});
+}
+// Paint each box a shade of the album-art accent by its level, and mark the
+// box nearest the current volume (or MUTE) as selected.
+function renderVolBoxes() {
+  const wrap = document.getElementById("vol-boxes");
+  if (!wrap || !wrap.children.length) return;
+  const accent = (getComputedStyle(document.documentElement).getPropertyValue("--art-accent") || "#9a9a9a").trim();
+  const rgb = hexToRgb(accent);
+  const sel = sonosMuted ? 0 : VOL_PRESETS.reduce((a, b) => Math.abs(b - sonosVol) < Math.abs(a - sonosVol) ? b : a);
+  const n = VOL_PRESETS.length;
+  const VOL_VIS_MIN = 0.15;   // darkest (Mute) shade
+  wrap.querySelectorAll(".vol-box").forEach((box, i) => {
+    const p = Number(box.dataset.vol);
+    // even gradient by position: full color at top (100%) down to VOL_VIS_MIN at the bottom (Mute)
+    const vf = n <= 1 ? 1 : 1 - (i / (n - 1)) * (1 - VOL_VIS_MIN);
+    box.style.background = "rgb(" + Math.round(rgb[0] * vf) + "," + Math.round(rgb[1] * vf) + "," + Math.round(rgb[2] * vf) + ")";
+    box.classList.toggle("sel", p === sel);
+    if (p === 0) box.textContent = sonosMuted ? "Unmute" : "Mute";   // label follows state
+  });
+}
+function bindVolBoxes() {
+  const wrap = document.getElementById("vol-boxes");
+  if (!wrap) return;
+  VOL_PRESETS.forEach((p) => {
+    const box = document.createElement("button");
+    box.type = "button";
+    box.className = "vol-box";
+    box.dataset.vol = String(p);
+    box.textContent = p === 0 ? "Mute" : p + "%";
+    box.setAttribute("aria-label", p === 0 ? "Mute" : p + "% volume");
+    box.__pick = (announce) => {
+      volHoldUntil = Date.now() + 6000;
+      if (p === 0) {
+        sonosMuted = !sonosMuted;   // toggle mute/unmute
+        sendMute(sonosMuted);
+      } else {
+        if (sonosMuted) { sonosMuted = false; sendMute(false); }
+        sonosVol = p;
+        setSonosVolume(p);
+      }
+      renderVol(); renderNP();
+      if (announce) toast(p === 0 ? (sonosMuted ? "Muted." : "Unmuted.") : "Volume " + p + "%.");
+    };
+    wrap.appendChild(box);
+  });
+  bindStripPick(wrap, ".vol-box");
+  renderVolBoxes();
+}
+
 // Real online/offline indicator, based on Hue bridge reachability.
 function setConn(online) {
   const state = online ? "online" : "offline";
@@ -686,6 +778,42 @@ function nearestSwatch(state) {
   });
   return best || COLORS.find((c) => c.name === "White");
 }
+// Map an actual brightness % to the brightness BOXES' display opacity (the
+// floored/spread visual), interpolating between the presets. So 1% real -> the
+// 1% box's ~0.25 display, not 0.01.
+function briDisplayOpacity(pct) {
+  if (pct == null) return 1;
+  const pairs = BRI_PRESETS
+    .map((p, i) => [p, briVis(i, BRI_PRESETS.length, p)])
+    .sort((a, b) => a[0] - b[0]);
+  if (pct <= pairs[0][0]) return pairs[0][1];
+  if (pct >= pairs[pairs.length - 1][0]) return pairs[pairs.length - 1][1];
+  for (let i = 1; i < pairs.length; i++) {
+    if (pct <= pairs[i][0]) {
+      const t = (pct - pairs[i - 1][0]) / (pairs[i][0] - pairs[i - 1][0]);
+      return pairs[i - 1][1] + (pairs[i][1] - pairs[i - 1][1]) * t;
+    }
+  }
+  return 1;
+}
+// Header color follows the active deck: the live light hue on Lights, the
+// album-art color on Music.
+function updateHeaderColor() {
+  const el = document.querySelector('.kitchen-head .kitchen-title');
+  if (!el) return;
+  const music = document.getElementById("deck-music");
+  if (music && music.classList.contains("deck-active")) {
+    const accent = (getComputedStyle(document.documentElement).getPropertyValue("--art-accent") || "#9a9a9a").trim();
+    el.style.color = accent;
+    el.style.opacity = 1;
+    el.style.setProperty("-webkit-text-stroke-color", "#ffffff");
+  } else {
+    el.style.color = lightsOn === true ? lightHeroBg : "#8a8a8a";
+    el.style.opacity = lightsOn === true ? briDisplayOpacity(lightsBri) : 1;
+    const whiteLight = lightsOn === true && lightHeroBg && lightHeroBg.toLowerCase() === "#ffffff";
+    el.style.setProperty("-webkit-text-stroke-color", whiteLight ? "#000000" : "#ffffff");
+  }
+}
 // Hero reflects the ACTUAL current light (on/off + color), not the staged pick.
 function paintHero(on, state) {
   let bg, fg;
@@ -706,6 +834,14 @@ function paintHero(on, state) {
   }
   const card = document.getElementById("room-" + ROOM);   // home page: tint the room tile
   if (card) { card.style.background = bg; card.style.color = fg; }
+  lightHeroBg = bg;                 // remember the light color for the header
+  updateHeaderColor();              // header follows deck: light color (Lights) / art color (Music)
+  // Lights deck tab reflects the actual light color (black when off)
+  const ltab = document.querySelector('.deck-tab[data-deck="deck-lights"]');
+  if (ltab) {
+    ltab.style.background = bg;
+    ltab.style.color = fg;
+  }
 }
 
 function bridgeList(bridge) {
@@ -781,7 +917,7 @@ function tintRoomCard(card) {
 // pills with each room's own live light color (same as the home tiles).
 const ROOM_LIGHTS = {
   "/kitchen/":  { bridge: "main",    group: "82", members: "22,21,20,63,62" },
-  "/bedroom/":  { bridge: "bedroom", group: "99", members: "43,44,47,48,49,50,53,54" },
+  "/bed/":      { bridge: "bedroom", group: "99", members: "43,44,47,48,49,50,53,54" },
   "/bathroom/": { bridge: "bedroom", group: "88", members: "22,24,20,21,34,35" },
 };
 function initNavLights() {   // stamp each nav pill with its room's light config
@@ -805,23 +941,35 @@ function updateLightsStatus() {
       if (!status.online) throw new Error("Hue offline");
       setConn(status.complete);
       lightsOn = status.on;
+      const bpct = typeof status.bri === "number" ? Math.round((status.bri / 254) * 100) : null;
+      lightsBri = status.on ? bpct : null;
+      lightsColor = status.on ? nearestSwatch(status.state).name : null;
       const text = document.getElementById("lights-line-text");
-      if (status.on) {
-        const pct = typeof status.bri === "number" ? Math.round((status.bri / 254) * 100) : null;
-        if (text) text.textContent = "Lights on" + (pct != null ? " " + pct + "%" : "");
-      } else if (text) {
-        text.textContent = "Lights off";
+      if (text) {
+        // Brightness block shows "Lights off" only; when on, the slider bubble
+        // already reports the % so the line is hidden (and its space collapses).
+        text.textContent = status.on ? "" : "Lights off";
+        const line = text.closest(".lights-line");
+        if (line) line.hidden = status.on;
       }
       paintHero(status.on, status.state);
       updateToggle();
+      refreshOffButtons();
     })
     .catch(() => {
       setConn(false);
       lightsOn = null;
+      lightsBri = null;
+      lightsColor = null;
       const text = document.getElementById("lights-line-text");
-      if (text) text.textContent = "Lights —";
+      if (text) {
+        text.textContent = "Lights —";
+        const line = text.closest(".lights-line");
+        if (line) line.hidden = false;
+      }
       paintHero(false, null);
       updateToggle();
+      refreshOffButtons();
     });
 }
 
@@ -840,14 +988,12 @@ function resetLightControls() {
   const white = COLORS.find((c) => c.name === "White");
   pendingColor = { body: white.body, css: white.css, name: white.name };
   pendingBri = 254;                                 // 100%
+  pendingBriVis = 1;
   dirty = false;
-  const slider = document.getElementById("brightness");
-  const out = document.getElementById("bri-val");
-  if (slider) slider.value = 99;
-  if (out) out.textContent = "100%";
-  updateBriBubble();
   selectSwatch(document.querySelector('#swatches .swatch[data-name="White"]'));
+  selectBri(document.querySelector('#bri-boxes .bri-box[data-pct="100"]'));
   setTrackColor(white.css);
+  paintBriBoxes(white.css);
   updateToggle();
 }
 
@@ -855,65 +1001,159 @@ function resetLightControls() {
 function updateToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
-  const txt = btn.querySelector(".toggle-txt");
   const pct = pendingBri != null ? Math.round((pendingBri / 254) * 100) : 100;
   const name = pendingColor ? pendingColor.name : "";
   const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
-  if (txt) txt.textContent = isOff ? "Lights off" : pct + "% " + name + " Engage";
-  btn.style.background = "";
+  const pctEl = document.getElementById("engage-pct");
+  if (pctEl) pctEl.textContent = isOff ? "Off" : pct + "%";
+  const nameEl = document.getElementById("engage-color");
+  if (nameEl) {
+    nameEl.textContent = pendingColor ? pendingColor.name : "";
+    if (pendingColor) {
+      nameEl.style.color = pendingColor.css;   // the word IS the color
+      // white outline, but black for the white word so it stays visible
+      nameEl.style.setProperty("-webkit-text-stroke-color", pendingColor.name === "White" ? "#000000" : "#ffffff");
+    }
+  }
+  const paddle = btn.querySelector(".engage-paddle");   // the switch paddle carries the color
   btn.style.color = "";
   btn.dataset.state = lightsOn === true ? "on" : lightsOn === false ? "off" : "unknown";
   if (isOff) {                                // black or 0% -> off preview
-    btn.style.background = "#000000";
+    if (paddle) paddle.style.background = "#000000";
     btn.style.color = "#b8b8b8";              // light gray, like the off hero
-  } else if (pendingColor) {                  // show the selected color
-    btn.style.background = pendingColor.css;
-    btn.style.color = textColorFor(pendingColor.css);
+  } else if (pendingColor) {                  // paddle = the color at the chosen brightness's display shade
+    const frac = pendingBriVis;
+    const rgb = hexToRgb(pendingColor.css);
+    const r = Math.round(rgb[0] * frac), g = Math.round(rgb[1] * frac), b = Math.round(rgb[2] * frac);
+    if (paddle) paddle.style.background = "rgb(" + r + "," + g + "," + b + ")";
+    // text: always white, except black when White is the chosen color
+    btn.style.color = pendingColor.name === "White" ? "#000000" : "#ffffff";
   }
-  // 100% button mirrors the staged color (like the Engage button)
-  const b100 = document.getElementById("bri-100");
-  if (b100 && pendingColor) {
-    b100.style.background = pendingColor.css;
-    b100.style.color = textColorFor(pendingColor.css);
+  // Wall switch reads "on" only when the room actually matches the staged
+  // color + brightness (so the default White/100% shows on only if the room
+  // is really white at 100%).
+  const pctMatch = lightsBri != null && Math.abs(lightsBri - pct) <= 6;
+  const colorMatch = pendingColor && lightsColor && pendingColor.name === lightsColor;
+  const engaged = lightsOn === true && colorMatch && pctMatch;
+  btn.classList.toggle("engaged", engaged);
+  // engaged (the "swipe down for off" state) uses our standard gray + light text
+  if (engaged && paddle) {
+    paddle.style.background = "var(--surface)";
+    btn.style.color = "#f5f5f4";
+  }
+  updateLightsTab();
+}
+
+// The "Lights" deck tab reflects status: "Lights 75%" when on, "Lights Off"
+// when off, plain "Lights" until the first bridge read.
+function updateLightsTab() {
+  const suffix = document.querySelector('.deck-tab[data-deck="deck-lights"] .deck-tab-pct');
+  if (suffix) {
+    if (lightsOn === true) suffix.textContent = lightsBri != null ? "(" + lightsBri + "%)" : "";
+    else if (lightsOn === false) suffix.textContent = "(Off)";
+    else suffix.textContent = "";
+  }
+  updateHeroStatus();
+}
+
+// Header shows the light status after "Bed Lights" — e.g. "Bed Lights 75%" /
+// "Bed Lights Off" — but only while the Lights deck is showing.
+function updateHeroStatus() {
+  const el = document.getElementById("hero-status");
+  if (!el) return;
+  const lights = document.getElementById("deck-lights");
+  const music = document.getElementById("deck-music");
+  if (lights && lights.classList.contains("deck-active")) {          // Lights: brightness
+    if (lightsOn === true) el.textContent = lightsBri != null ? lightsBri + "%" : "";
+    else if (lightsOn === false) el.textContent = "Off";
+    else el.textContent = "";
+  } else if (music && music.classList.contains("deck-active")) {     // Music: volume
+    el.textContent = sonosMuted ? "Muted" : sonosVol + "%";
+  } else {
+    el.textContent = "";
   }
 }
 
 function bindLightsToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
-  btn.addEventListener("click", () => {
+  const doEngage = () => {
     const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
     if (isOff) {
       // the chosen setting is itself "off" (black or 0%) -> apply off
       runHue({ on: false });                // this room's group, on this room's bridge
       resetLightControls();
       lightsOn = false;
-      toast("The " + ROOM_LABEL + " lights are off.");
+      lightsColor = null; lightsBri = null;   // optimistic: room is now off
+      toast(ROOM_LABEL + " lights off.");
     } else {
       // enact the current selection (turn on / update in place); keep selection
       const body = pendingColor && pendingColor.body ? Object.assign({}, pendingColor.body) : { on: true };
       if (pendingBri != null && pendingBri > 0) body.bri = pendingBri;
-      runHue(body);
+      applyLights(body);   // colored scene skips the office lamp; white/off include it
       dirty = false;
       lightsOn = true;
-      toast("Engaged.");
+      // optimistic: room now matches the staged selection (switch flips on)
+      lightsColor = pendingColor ? pendingColor.name : null;
+      lightsBri = pendingBri != null ? Math.round((pendingBri / 254) * 100) : 100;
+      toast(ROOM_LABEL + " lights engaged.");
     }
     updateToggle();
     window.setTimeout(updateLightsStatus, 500);          // confirm from bridge
+  };
+  // Swipe down = turn off this room's lights (group incl. the office lamp), like
+  // the BEDROOM LIGHTS OFF button. Keeps the staged selection.
+  const doOff = () => {
+    runHue({ on: false });
+    lightsOn = false; lightsColor = null; lightsBri = null;   // optimistic: paddle drops
+    toast(ROOM_LABEL + " lights off.");
+    updateToggle();
+    window.setTimeout(updateLightsStatus, 500);
+  };
+
+  // Tap or swipe up = engage; swipe down = off.
+  let sx = 0, sy = 0, tracking = false, swiped = false;
+  btn.addEventListener("touchstart", (e) => {
+    const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; tracking = true; swiped = false;
+  }, { passive: true });
+  btn.addEventListener("touchend", (e) => {
+    if (!tracking) return; tracking = false;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dy) > 28 && Math.abs(dy) > Math.abs(dx)) {   // a clear vertical swipe
+      swiped = true;
+      if (dy < 0) doEngage(); else doOff();                  // up = on, down = off
+    }
+  }, { passive: true });
+  btn.addEventListener("click", () => {
+    if (swiped) { swiped = false; return; }   // the swipe already handled it
+    // tap/click toggles: if the switch is up (on) turn off, else engage
+    if (btn.classList.contains("engaged")) doOff();
+    else doEngage();
   });
 }
 
+// Turn off only THIS room's lights (its own Hue group, on its own bridge).
+function bindRoomOff() {
+  const btn = document.getElementById("room-off");
+  if (!btn) return;
+  btn.textContent = ROOM_LABEL.toUpperCase() + " LIGHTS OFF";
+  btn.addEventListener("click", () => {
+    runHue({ on: false });
+    toast(ROOM_LABEL + " lights off.");
+    window.setTimeout(updateLightsStatus, 500);
+  });
+}
 // Turn off EVERY light on this room's Hue hub. main hub = Front of House,
 // bedroom hub = Back of House. Group 0 is the bridge's built-in "all lights".
 function bindHouseOff() {
   const btn = document.getElementById("house-off");
   if (!btn) return;
   const foh = HUE_BRIDGE === "main";
-  const label = foh ? "FOH OFF" : "BOH OFF";
+  const label = foh ? "FRONT OF HOUSE OFF" : "BACK OF HOUSE OFF";
   btn.textContent = label;
   btn.addEventListener("click", () => {
     runHueProxy({ path: "/groups/0/action", body: { on: false } });
-    toast((foh ? "Front" : "Back") + " of house lights off.");
+    toast((foh ? "Front" : "Back") + " of house off.");
     window.setTimeout(updateLightsStatus, 500);
   });
 }
@@ -921,32 +1161,125 @@ function bindHouseOff() {
 function bindHouseOffAll() {
   const btn = document.getElementById("house-off-all");
   if (!btn) return;
-  btn.textContent = "HOUSE OFF";
+  btn.textContent = "WHOLE HOUSE OFF";
   btn.addEventListener("click", () => {
     HUE_ALL_BRIDGES.forEach((bridge) => {
       fetch("/hue", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bridge: bridge, path: "/groups/0/action", body: { on: false } }),
         keepalive: true }).catch(() => {});
     });
-    toast("All house lights off.");
+    toast("All House lights off.");
     window.setTimeout(updateLightsStatus, 500);
   });
 }
 
-/* ---------- Brightness slider + ROYGBIV color swatches ---------- */
-// Position the % bubble over the brightness slider's thumb (bedroom only).
-function updateBriBubble() {
-  const slider = document.getElementById("brightness");
-  const bubble = document.getElementById("bri-bubble");
-  if (!slider || !bubble) return;
-  const min = Number(slider.min), max = Number(slider.max), val = Number(slider.value);
-  const frac = max > min ? (val - min) / (max - min) : 0;
-  const thumb = 18;                                   // matches .slider thumb width
-  const x = slider.offsetLeft + thumb / 2 + frac * (slider.offsetWidth - thumb);
-  bubble.style.left = x + "px";
-  bubble.textContent = (val >= max ? 100 : val) + "%";
+// Gray out an OFF button when its action would do nothing (all target lights
+// are already off). Native `disabled` also blocks the click.
+function setOffDisabled(btn, disabled) {
+  if (!btn) return;
+  btn.disabled = !!disabled;
+  btn.setAttribute("aria-disabled", disabled ? "true" : "false");
 }
+// Refresh the three OFF buttons' disabled state against live bridge status:
+//   room-off (BED OFF)      -> disabled when this room's own lights are all off
+//   house-off (BOH/FOH OFF) -> disabled when this hub's lights are all off
+//   house-off-all (HOUSE)   -> disabled when every light in the house is off
+// Group 0 is each bridge's built-in "all lights"; its state.any_on tells us
+// whether anything on that hub is still lit.
+function refreshOffButtons() {
+  setOffDisabled(document.getElementById("room-off"), lightsOn === false);
+  const hubBtn = document.getElementById("house-off");
+  const houseBtn = document.getElementById("house-off-all");
+  if (!hubBtn && !houseBtn) return;
+  Promise.all(HUE_ALL_BRIDGES.map((b) =>
+    hueGet(b, "/groups/0")
+      .then((g) => ({ b: b, any: !!(g && g.state && g.state.any_on) }))
+      .catch(() => ({ b: b, any: null }))          // unreachable -> leave as-is
+  )).then((res) => {
+    if (hubBtn) {
+      const hub = HUE_BRIDGE === "all"
+        ? res.some((r) => r.any === true)
+        : (res.find((r) => r.b === HUE_BRIDGE) || {}).any;
+      if (hub === true || hub === false) setOffDisabled(hubBtn, hub === false);
+    }
+    if (houseBtn && res.every((r) => r.any !== null)) {
+      setOffDisabled(houseBtn, !res.some((r) => r.any === true));
+    }
+  });
+}
+
+/* ---------- Color swatches (col 1) + brightness preset boxes (col 2) ---------- */
+// Brightness shown as 7 stacked boxes, top -> bottom.
+const BRI_PRESETS = [100, 90, 75, 50, 25, 10, 1];
+// Display-only shade per box: spread evenly from full (top row) down to
+// BRI_VIS_MIN (bottom row) so all 7 look distinct even though the real light
+// values bunch up at the low end. Labels + actual light settings are unaffected.
+const BRI_VIS_MIN = 0.22;
+// Per-preset display-shade overrides (by label %). Tweak these freely; they only
+// change how a box/Engage looks, never the label or the light value.
+const BRI_VIS_OVERRIDE = { 1: 0.25 };
+function briVis(i, n, p) {
+  if (BRI_VIS_OVERRIDE[p] != null) return BRI_VIS_OVERRIDE[p];
+  return n <= 1 ? 1 : 1 - (i / (n - 1)) * (1 - BRI_VIS_MIN);
+}
+
+function selectBri(el) {
+  if (selectedBriEl) selectedBriEl.classList.remove("sel");
+  selectedBriEl = el;
+  if (el) el.classList.add("sel");
+}
+
+// Tap or slide a finger across a column of pickable boxes (each carries __pick).
+function bindStripPick(container, itemSel) {
+  if (!container) return;
+  let picking = false, dragged = false, lastEl = null;
+  const itemAt = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    return el && el.closest ? el.closest(itemSel) : null;
+  };
+  container.addEventListener("pointerdown", (e) => {
+    picking = true; dragged = false; lastEl = null;
+    if (container.setPointerCapture) container.setPointerCapture(e.pointerId);
+    const it = itemAt(e.clientX, e.clientY);
+    if (it && it.__pick) { it.__pick(false); lastEl = it; }
+    e.preventDefault();
+  });
+  container.addEventListener("pointermove", (e) => {
+    if (!picking) return;
+    const it = itemAt(e.clientX, e.clientY);
+    if (it && it.__pick && it !== lastEl) { dragged = true; it.__pick(false); lastEl = it; }
+  });
+  const end = () => {
+    if (!picking) return;
+    picking = false;
+    if (dragged && lastEl && lastEl.__pick) lastEl.__pick(true);   // announce final pick
+  };
+  container.addEventListener("pointerup", end);
+  container.addEventListener("pointercancel", end);
+  container.addEventListener("click", (e) => {                     // tap / keyboard
+    const it = e.target.closest ? e.target.closest(itemSel) : null;
+    if (dragged) { dragged = false; return; }
+    if (it && it.__pick) it.__pick(true);
+  });
+}
+
+// Tint the brightness boxes to shades of the chosen color (dimmer box = darker).
+function paintBriBoxes(css) {
+  const rgb = hexToRgb(css);
+  const isWhite = css.toLowerCase() === "#ffffff";
+  const text = isWhite ? "#000000" : "#ffffff";   // black only for White
+  const boxes = document.getElementById("bri-boxes");
+  if (boxes) boxes.classList.toggle("on-white", isWhite);   // black selection ring for White
+  document.querySelectorAll("#bri-boxes .bri-box").forEach((box) => {
+    const vf = Number(box.dataset.vis);   // display shade (spread, floored) — set at build
+    const r = Math.round(rgb[0] * vf), g = Math.round(rgb[1] * vf), b = Math.round(rgb[2] * vf);
+    box.style.background = "rgb(" + r + "," + g + "," + b + ")";
+    box.style.color = text;
+  });
+}
+
 function bindLightTools() {
+  // Column 1 — colors (White top -> Purple bottom)
   const swatches = document.getElementById("swatches");
   if (swatches) {
     COLORS.forEach((c) => {
@@ -957,46 +1290,48 @@ function bindLightTools() {
       b.title = c.name;
       b.setAttribute("aria-label", c.name);
       b.dataset.name = c.name;
-      b.addEventListener("click", () => {
+      b.__pick = (announce) => {
+        if (selectedSwatchEl === b && !announce) return;
         selectSwatch(b);
-        setTrackColor(c.css);              // brightness bar takes the color
-        pendingColor = { body: c.body, css: c.css, name: c.name, off: c.off };   // always stage
+        setTrackColor(c.css);
+        paintBriBoxes(c.css);                     // brightness column takes the chosen color
+        pendingColor = { body: c.body, css: c.css, name: c.name, off: c.off };
         dirty = true;
         updateToggle();
-        toast(c.name + " staged — press Engage.");
-      });
+        if (announce) toast(c.name + " ready — press Engage.");
+      };
       swatches.appendChild(b);
     });
+    bindStripPick(swatches, ".swatch");
   }
 
-  const slider = document.getElementById("brightness");
-  const out = document.getElementById("bri-val");
-  if (slider) {
-    slider.addEventListener("input", () => {
-      const pct = Number(slider.value);            // 1..99
-      if (out) out.textContent = pct + "%";
-      updateBriBubble();
-      pendingBri = Math.round((pct / 100) * 254);
-      dirty = true;
-      updateToggle();
+  // Column 2 — brightness presets (100% top -> 1% bottom), darker box = dimmer
+  const briBoxes = document.getElementById("bri-boxes");
+  if (briBoxes) {
+    BRI_PRESETS.forEach((p, i) => {
+      const box = document.createElement("button");
+      box.type = "button";
+      box.className = "bri-box";
+      box.dataset.pct = String(p);
+      const vis = briVis(i, BRI_PRESETS.length, p);
+      box.dataset.vis = String(vis);
+      const v = Math.round(vis * 255);
+      box.style.background = "rgb(" + v + "," + v + "," + v + ")";
+      box.textContent = p + "%";
+      box.setAttribute("aria-label", p + "% brightness");
+      box.__pick = (announce) => {
+        if (selectedBriEl === box && !announce) return;
+        selectBri(box);
+        pendingBri = Math.round((p / 100) * 254);
+        pendingBriVis = vis;
+        dirty = true;
+        updateToggle();
+        if (announce) toast(p + "% ready — press Engage.");
+      };
+      briBoxes.appendChild(box);
     });
+    bindStripPick(briBoxes, ".bri-box");
   }
-  const b0 = document.getElementById("bri-0");     // 0% = off
-  const b100 = document.getElementById("bri-100"); // 100% = brightest
-  if (b0) b0.addEventListener("click", () => {
-    pendingBri = 0; dirty = true;
-    if (out) out.textContent = "0%";
-    updateToggle();
-  });
-  if (b100) b100.addEventListener("click", () => {
-    pendingBri = 254; dirty = true;
-    if (out) out.textContent = "100%";
-    if (slider) slider.value = slider.max;
-    updateBriBubble();
-    updateToggle();
-  });
-  updateBriBubble();
-  window.addEventListener("resize", updateBriBubble);
 }
 
 /* ---------- Decide how an action runs ---------- */
@@ -1051,7 +1386,7 @@ function makeRow({ icon, title, meta, shortcut, nowPlaying }) {
       setNowPlaying(nowPlaying);
       markPlaying(btn);
     }
-    toast('Very good. Playing "' + title + '" in the kitchen.');
+    toast("Now playing " + title);
     runAction(shortcut);
   });
   return btn;
@@ -1124,9 +1459,24 @@ function bindShortcutButtons() {
 }
 
 /* ---------- Print the QR sheet ---------- */
+// Each print button targets its own sheet by id (data-print="ps-kitchen").
+// Only the targeted sheet gets `.printing`, so the others stay hidden.
 function bindPrint() {
   document.querySelectorAll("[data-print]").forEach((btn) => {
-    btn.addEventListener("click", () => window.print());
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-print");
+      const sheet = (id && id !== "true" && document.getElementById(id))
+        || document.querySelector(".print-sheet");
+      document.querySelectorAll(".print-sheet.printing")
+        .forEach((s) => s.classList.remove("printing"));
+      if (sheet) sheet.classList.add("printing");
+      const cleanup = () => {
+        if (sheet) sheet.classList.remove("printing");
+        window.removeEventListener("afterprint", cleanup);
+      };
+      window.addEventListener("afterprint", cleanup);
+      window.print();
+    });
   });
 }
 
@@ -1134,7 +1484,7 @@ function bindPrint() {
 function bindSoonRooms() {
   document.querySelectorAll("[data-soon]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      toast("My apologies — " + btn.dataset.soon + " isn't in service just yet.");
+      toast(btn.dataset.soon + " isn't ready yet.");
     });
   });
 }
@@ -1147,12 +1497,14 @@ document.addEventListener("DOMContentLoaded", () => {
   bindPrint();
   bindSoonRooms();
   bindLightsToggle();
+  bindRoomOff();
   bindHouseOff();
   bindHouseOffAll();
   bindDragScroll();
   bindLightTools();
   resetLightControls();     // default selection: white + 100%
   bindVolume();
+  bindVolBoxes();
   renderMusic();
   renderShare();
   bindTv();
@@ -1165,6 +1517,10 @@ document.addEventListener("DOMContentLoaded", () => {
   tintHomeCards();             // tint home tiles AND room-nav pills by room light color
   window.setInterval(tintHomeCards, 10000);
   window.addEventListener("visibilitychange", () => { if (!document.hidden) tintHomeCards(); });
+  if (CFG.sonosSolo) {                        // this room plays alone — eject anyone grouped in
+    fetch("/sonos/isolate", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: withRoom({}), keepalive: true }).catch(() => {});
+  }
   updateSonos();
   window.setInterval(updateSonos, 5000);    // keep now-playing/volume fresh
 });

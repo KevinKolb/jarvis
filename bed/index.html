@@ -8,43 +8,82 @@
   <meta name="theme-color" content="#f4f1e6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#14140f" media="(prefers-color-scheme: dark)">
   <title>Bedroom · JARVIS</title>
-  <link rel="icon" href="/bedroom/bedroom.ico" sizes="any">
+  <link rel="icon" href="/bed/bed.ico?v=3" sizes="any">
+  <link rel="apple-touch-icon" href="/bed/bed-touch.png?v=3">
   <meta name="apple-mobile-web-app-title" content="Bedroom">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/styles.css">
-  <link rel="stylesheet" href="/bedroom/bedroom.css">
+  <link rel="stylesheet" href="../assets/styles.css?v=5">
+  <link rel="stylesheet" href="/bed/bed.css?v=5">
 </head>
 <body>
   <main class="page" data-room="bedroom" data-sonos-room="bedroom"
-        data-hue-bridge="bedroom" data-lights-group="99" data-lights-members="43,44,47,48,49,50,53,54">
-    <!-- Room nav -->
-    <nav class="room-nav" aria-label="Rooms">
-      <a class="room-nav-home" href="/" aria-label="All rooms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg></a>
-      <a href="/kitchen/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</a>
-      <a href="/bedroom/" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bed</a>
-      <a href="/bathroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bath</a>
-    </nav>
-
-    <!-- Bedroom header -->
-    <header class="kitchen-head" id="bedroom-hero">
-      <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>Bedroom</h1>
+        data-hue-bridge="bedroom" data-lights-group="99" data-lights-members="43,44,47,48,49,50,53,54"
+        data-office-lamp="54">
+    <!-- Bed header -->
+    <header class="kitchen-head" id="bed-hero">
+      <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>Bedroom <span id="hero-deck">Lights</span><span id="hero-status"></span></h1>
     </header>
 
-    <!-- Sound (Sonos) — now-playing + controls in one box -->
-    <section class="section theme-music" aria-label="Sound">
-      <div class="light-tools">
-        <div class="np-status">
-          <div class="np-primary" id="np-track">—</div>
-          <div class="np-secondary" id="np-sub"></div>
+    <a class="btn swipe-music" id="swipe-deck" href="?deck=music" aria-label="Switch view">
+      <span class="swipe-arrows">&lt;&lt;&lt;</span>
+      <svg class="swipe-ico ico-music" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      <svg class="swipe-ico ico-lights" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5C17.7 10.2 18 9 18 8a6 6 0 0 0-12 0c0 1 .3 2.2 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+      <span id="swipe-label">Swipe here for music</span>
+      <span class="swipe-arrows">&gt;&gt;&gt;</span>
+    </a>
+
+    <div class="room-decks" id="room-decks">
+
+    <!-- Lights -->
+    <section class="section theme-lights deck" id="deck-lights" aria-label="Lights">
+      <!-- 3 columns: COLOR · BRIGHT · ON -->
+      <div class="light-tools lights-3">
+        <div class="l3-cell">
+          <div class="l3-head"><span class="l3-num">1</span>Choose Color</div>
+          <div class="swatches" id="swatches" role="group" aria-label="Light color"></div>
         </div>
+        <div class="l3-cell">
+          <div class="l3-head"><span class="l3-num">2</span>Choose Bright</div>
+          <div class="bri-boxes" id="bri-boxes" role="group" aria-label="Brightness"></div>
+        </div>
+        <div class="l3-cell l3-engage">
+          <div class="l3-head"><span class="l3-num">3</span>Swipe On</div>
+          <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle bedroom lights">
+            <span class="engage-paddle">
+              <span class="engage-cta engage-up">Swipe Up<br>Here For</span>
+              <span class="engage-color engage-up" id="engage-color">White</span>
+              <span class="engage-pct engage-up" id="engage-pct">100%</span>
+              <span class="engage-cta engage-down">Swipe Down<br>For Off</span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Off buttons: free-floating, no container box -->
+      <div class="off-row">
+        <button class="btn btn-house-off" id="room-off" type="button" aria-label="Turn off the bedroom lights"></button>
+        <button class="btn btn-house-off" id="house-off" type="button" aria-label="Turn off all lights on this hub"></button>
+        <button class="btn btn-house-off btn-house-off-all" id="house-off-all" type="button" aria-label="Turn off every light in the house">WHOLE HOUSE OFF</button>
+      </div>
+    </section>
+
+    <!-- Sound (Sonos) — now-playing + controls in one box -->
+    <section class="section theme-music deck" id="deck-music" aria-label="Sound">
+      <div class="light-tools">
+        <div class="np-row">
         <div class="np-art-wrap">
           <img class="np-art" id="np-art" alt="Album art" hidden>
           <div class="np-art np-art-loading" id="np-art-loading"><span id="np-art-msg">Loading art…</span></div>
           <div class="np-art np-art-tv" id="np-art-tv" role="img" aria-label="TV audio playing" hidden>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/></svg>
             <span>TV</span>
+          </div>
+          <div class="np-status">
+            <div class="np-primary" id="np-track">—</div>
+            <div class="np-secondary" id="np-sub"></div>
+            <div class="np-tertiary" id="np-cat"></div>
           </div>
           <div class="np-playbar">
             <button class="np-skip np-prev" id="np-prev" type="button" aria-label="Previous track" hidden>
@@ -59,18 +98,15 @@
             </button>
           </div>
         </div>
-        <div class="tool-row">
-          <span class="tool-label">Volume</span>
-          <div class="bri-row">
-            <button class="bri-end bri-off" id="vol-mute" type="button" aria-label="Mute toggle">Mute</button>
-            <input type="range" id="volume" class="slider vol-slider" min="1" max="99" value="24" aria-label="Volume">
-            <button class="bri-end vol-max" id="vol-100" type="button" aria-label="Max (100%)">100%</button>
+          <div class="vol-boxes" id="vol-boxes" role="group" aria-label="Volume"></div>
+        </div>
+        <div class="chan-box">
+          <div class="tool-row">
+            <span class="tool-label">Play In</span>
+            <div class="chan-row" id="row-share"></div>
           </div>
         </div>
-        <div class="tool-row">
-          <span class="tool-label">Share</span>
-          <div class="chan-row" id="row-share"></div>
-        </div>
+        <div class="chan-box">
         <div class="tool-row">
           <span class="tool-label">TV</span>
           <button class="btn btn-tv" id="tv-mode" type="button" aria-label="Switch bedroom Sonos to TV audio">
@@ -102,87 +138,92 @@
           <span class="tool-label">Podcasts</span>
           <div class="chan-row" id="row-podcasts"></div>
         </div>
+        </div><!-- /.chan-box -->
       </div>
     </section>
 
-    <!-- Lights -->
-    <section class="section theme-lights" aria-label="Lights">
-      <!-- Brightness -->
-      <div class="light-tools">
-        <div class="lights-line"><span id="lights-line-text">Off</span></div>
-        <div class="tool-row">
-          <span class="tool-label">Brightness</span>
-          <div class="bri-row">
-            <button class="bri-end bri-off" id="bri-0" type="button" aria-label="Off (0%)">0%</button>
-            <div class="slider-wrap">
-              <output class="slider-bubble" id="bri-bubble" for="brightness">100%</output>
-              <input type="range" id="brightness" class="slider" min="1" max="99" value="99" aria-label="Brightness">
-            </div>
-            <button class="bri-end" id="bri-100" type="button" aria-label="Brightest (100%)">100%</button>
-          </div>
-        </div>
-      </div>
+    </div><!-- /.room-decks -->
 
-      <!-- Color + Engage -->
-      <div class="light-tools">
-        <div class="tool-row">
-          <span class="tool-label">Color</span>
-          <div class="swatches" id="swatches" role="group" aria-label="Light color"></div>
-        </div>
-        <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle bedroom lights">
-          <span class="toggle-txt">Engage</span>
-        </button>
-      </div>
-
-      <!-- Off: this hub / whole house (side by side) -->
-      <div class="light-tools">
-        <div class="off-row">
-          <button class="btn btn-house-off" id="house-off" type="button" aria-label="Turn off all lights on this hub"></button>
-          <button class="btn btn-house-off btn-house-off-all" id="house-off-all" type="button" aria-label="Turn off every light in the house">HOUSE OFF</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- QR to this page -->
-    <section class="card qr" aria-label="Bedroom page QR code">
-      <div class="qr-frame">
-        <img class="qr-code" src="../assets/bedroom-qr.svg" width="88" height="88" alt="QR code that opens this bedroom page">
-      </div>
-      <div class="qr-body">
-        <div class="qr-title">Scan or print this QR code to control the bedroom</div>
-        <div class="qr-or">or visit</div>
-        <span class="qr-url">192.168.86.147/bedroom</span>
-        <div class="qr-wifi">must be on wifi (SpamNet)</div>
-        <button class="chip qr-print" type="button" data-print="true">
-          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
-          Print QR code
-        </button>
-      </div>
-    </section>
-
-    <footer class="page-footer">
-      <p class="wifi-note">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16.11a6 6 0 0 1 7 0"/><path d="M2 8.82a16 16 0 0 1 20 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-        Connect to <strong>SpamNet</strong> Wi-Fi to control the house.
-      </p>
-      <a class="backlink" href="/admin.html">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Admin
-      </a>
-      <div class="conn-status"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
-    </footer>
+    <!-- Room nav (footer) -->
+    <nav class="room-nav room-nav-footer" aria-label="Rooms">
+      <a class="room-nav-home" href="/" aria-label="Whole house"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>Whole House</a>
+      <a href="/kitchen/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</a>
+      <a href="/bed/" aria-current="page" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bedroom</a>
+      <a href="/bathroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bathroom</a>
+    </nav>
   </main>
-
-  <!-- Print-only sheet: SCAN TO CONTROL BEDROOM + QR + url -->
-  <div class="print-sheet" aria-hidden="true">
-    <div class="print-card">
-      <h1 class="print-heading">SCAN TO CONTROL BEDROOM</h1>
-      <img class="print-qr" src="../assets/bedroom-qr.svg" alt="QR code for the bedroom page">
-      <p class="print-url">192.168.86.147/bedroom</p>
-    </div>
-  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="../assets/app.js"></script>
+  <script>
+    /* Switch between the Lights and Music decks via swipe or the swipe buttons.
+       A URL variable selects one too:  /bed/?deck=lights  or  /bed/?deck=music  */
+    (function () {
+      var decks = document.getElementById('room-decks');
+      if (!decks) return;
+      var order = ['lights', 'music'];
+      var panels = order.map(function (k) { return document.getElementById('deck-' + k); });
+      var cur = 0;
+
+      // fromLeft = the new deck slides in from the left edge
+      function select(i, fromLeft) {
+        if (fromLeft == null) fromLeft = i < cur;         // default: direction of index change
+        cur = i;
+        decks.classList.toggle('from-left', !!fromLeft);
+        var hd = document.getElementById('hero-deck');
+        if (hd) hd.textContent = order[i] === 'music' ? 'Music' : 'Lights';
+        panels.forEach(function (p, n) {
+          if (!p) return;
+          p.classList.remove('deck-active');
+          if (n === i) { void p.offsetWidth; p.classList.add('deck-active'); }   // restart the slide-in
+        });
+        // the swipe button points to (and describes) the OTHER deck
+        var sw = document.getElementById('swipe-deck');
+        var swl = document.getElementById('swipe-label');
+        if (sw) {
+          var toMusicNow = i === 0;   // on Lights -> offer Music
+          sw.classList.toggle('show-lights', !toMusicNow);
+          sw.setAttribute('href', toMusicNow ? '?deck=music' : '?deck=lights');
+          if (swl) swl.textContent = toMusicNow ? 'Swipe here for music' : 'Swipe here for lights';
+        }
+        if (typeof updateHeroStatus === 'function') updateHeroStatus();   // status only shows on Lights
+        if (typeof updateHeaderColor === 'function') updateHeaderColor(); // light color (Lights) / art color (Music)
+        if (window.history && history.replaceState) {     // keep the URL shareable
+          history.replaceState(null, '', location.pathname + '?deck=' + order[i]);
+        }
+      }
+
+      function param(name) {
+        var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
+        return m ? decodeURIComponent(m[1]).toLowerCase() : '';
+      }
+
+      // The under-header swipe button toggles to the other deck.
+      var swipeBtn = document.getElementById('swipe-deck');
+      if (swipeBtn) swipeBtn.addEventListener('click', function (e) { e.preventDefault(); select(cur === 0 ? 1 : 0); });
+
+      // Swipe left or right ANYWHERE on screen to toggle to the other deck.
+      // Skip gestures that start on a horizontal scroller (channel rows).
+      var sx = 0, sy = 0, tracking = false;
+      document.addEventListener('touchstart', function (e) {
+        var t = e.changedTouches[0];
+        tracking = !(e.target.closest && e.target.closest('.chan-row'));
+        sx = t.clientX; sy = t.clientY;
+      }, { passive: true });
+      document.addEventListener('touchend', function (e) {
+        if (!tracking) return; tracking = false;
+        var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+          select(cur === 0 ? 1 : 0, dx > 0);   // either direction toggles; enters from the swipe side
+        }
+      }, { passive: true });
+
+      // Pick the deck named in ?deck=… (default: Lights)
+      var want = param('deck'), start = 0;
+      order.forEach(function (k, i) { if (k === want) start = i; });
+      cur = start;
+      select(start);
+    })();
+  </script>
 </body>
 </html>

@@ -344,6 +344,7 @@ class Handler(SimpleHTTPRequestHandler):
                 '</item></DIDL-Lite>') % (item_id, esc(title), cls, SONOS_CDUDN)
         self._sonos("AVTransport", "RemoveAllTracksFromQueue",
             '<u:RemoveAllTracksFromQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:RemoveAllTracksFromQueue>')
+        self._set_play_mode(shuffle)   # set mode BEFORE building the queue so albums aren't scrambled by a prior shuffle
         self._sonos("AVTransport", "AddURIToQueue",
             '<u:AddURIToQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
             '<EnqueuedURI>%s</EnqueuedURI><EnqueuedURIMetaData>%s</EnqueuedURIMetaData>'
@@ -352,7 +353,11 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "SetAVTransportURI",
             '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
             '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
-        self._set_play_mode(shuffle)
+        # track 1: seek to queue position 1 so it never starts mid-album
+        if not shuffle:
+            self._sonos("AVTransport", "Seek",
+                '<u:Seek xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
+                '<Unit>TRACK_NR</Unit><Target>1</Target></u:Seek>')
         self._sonos("AVTransport", "Play",
             '<u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:Play>')
         self._hold_end(vol)
@@ -850,6 +855,27 @@ class Handler(SimpleHTTPRequestHandler):
                         except Exception:
                             pass
                 self._json({"ok": True, "room": room, "grouped": join})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Make this room standalone: eject every speaker that isn't part of the
+        # room's own zone, so nothing else is grouped in.  POST /sonos/isolate
+        if self.path == "/sonos/isolate":
+            try:
+                keep = set(filter(None, [self.s_ip, self.s_join]))   # this room's own speakers
+                for coord, ips in self._zone_groups():
+                    if coord != self.s_uuid:
+                        continue                      # only touch this room's group
+                    for m in ips:
+                        if m not in keep:
+                            try:
+                                self._avt_ip(m, "BecomeCoordinatorOfStandaloneGroup",
+                                    '<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:BecomeCoordinatorOfStandaloneGroup>')
+                            except Exception:
+                                pass
+                self._ensure_kitchen_grouped()        # keep the room's own pair joined
+                self._json({"ok": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return

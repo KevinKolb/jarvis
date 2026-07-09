@@ -19,7 +19,7 @@ scp -q -r \
   "$DIR/index.html" \
   "$DIR/admin.html" \
   "$DIR/kitchen" \
-  "$DIR/bedroom" \
+  "$DIR/bed" \
   "$DIR/bathroom" \
   "$DIR/assets" \
   "$DIR/server.py" \

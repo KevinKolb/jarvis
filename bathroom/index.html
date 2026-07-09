@@ -22,8 +22,8 @@
     <nav class="room-nav" aria-label="Rooms">
       <a class="room-nav-home" href="/" aria-label="All rooms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg></a>
       <a href="/kitchen/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</a>
-      <a href="/bedroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bed</a>
-      <a href="/bathroom/" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bath</a>
+      <a href="/bed/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bedroom</a>
+      <a href="/bathroom/" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bathroom</a>
     </nav>
 
     <!-- Bathroom header -->
@@ -90,7 +90,7 @@
           </div>
         </div>
         <div class="tool-row">
-          <span class="tool-label">Share</span>
+          <span class="tool-label">Play In</span>
           <div class="chan-row" id="row-share"></div>
         </div>
         <div class="tool-row">
@@ -119,45 +119,7 @@
         </div>
       </div>
     </section>
-
-    <!-- QR to this page -->
-    <section class="card qr" aria-label="Bathroom page QR code">
-      <div class="qr-frame">
-        <img class="qr-code" src="../assets/bathroom-qr.svg" width="88" height="88" alt="QR code that opens this bathroom page">
-      </div>
-      <div class="qr-body">
-        <div class="qr-title">Scan or print this QR code to control the bathroom</div>
-        <div class="qr-or">or visit</div>
-        <span class="qr-url">192.168.86.147/bathroom</span>
-        <div class="qr-wifi">must be on wifi (SpamNet)</div>
-        <button class="chip qr-print" type="button" data-print="true">
-          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
-          Print QR code
-        </button>
-      </div>
-    </section>
-
-    <footer class="page-footer">
-      <p class="wifi-note">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16.11a6 6 0 0 1 7 0"/><path d="M2 8.82a16 16 0 0 1 20 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-        Connect to <strong>SpamNet</strong> Wi-Fi to control the house.
-      </p>
-      <a class="backlink" href="/admin.html">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Admin
-      </a>
-      <div class="conn-status"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
-    </footer>
   </main>
-
-  <!-- Print-only sheet: SCAN TO CONTROL BATHROOM + QR + url -->
-  <div class="print-sheet" aria-hidden="true">
-    <div class="print-card">
-      <h1 class="print-heading">SCAN TO CONTROL BATHROOM</h1>
-      <img class="print-qr" src="../assets/bathroom-qr.svg" alt="QR code for the bathroom page">
-      <p class="print-url">192.168.86.147/bathroom</p>
-    </div>
-  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="../assets/app.js"></script>

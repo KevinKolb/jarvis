@@ -507,7 +507,7 @@ button { font: inherit; color: inherit; }
 /* color swatches */
 .swatches {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   grid-gap: 0.4rem;
   gap: 0.4rem;
 }
@@ -1086,7 +1086,7 @@ button { font: inherit; color: inherit; }
   .page, .toast { display: none !important; }
   body { background: #fff !important; margin: 0; }
   body::before { display: none; }
-  .print-sheet {
+  .print-sheet.printing {
     display: flex !important;
     flex-direction: column;
     align-items: center;
