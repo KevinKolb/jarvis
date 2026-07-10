@@ -30,16 +30,17 @@ PORT      = 80
 # ---- Sonos.  The kitchen is an illusion: the UI says "Kitchen" but the REAL
 #      coordinator is the LOUNGE speaker, and the kitchen pair secretly joins
 #      it.  Other rooms (e.g. bedroom) are their own coordinator, no illusion.
-SONOS_IP   = "192.168.86.48"                # LOUNGE — kitchen's real coordinator
+SONOS_IP   = "192.168.86.48"                # LOUNGE — whole-house music source
 SONOS_UUID = "RINCON_F0F6C1CF5CCA01400"     # lounge coordinator UUID
-KITCHEN_IP = "192.168.86.41"                # kitchen pair — secretly grouped to lounge
+KITCHEN_IP = "192.168.86.41"                # kitchen stereo pair
+KITCHEN_UUID = "RINCON_7828CAE1ACD801400"   # kitchen pair coordinator UUID
 SONOS_SN    = "9"                           # Apple Music account serial on this system
 SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
 # Per-room Sonos target: coordinator ip/uuid, and a speaker that secretly
 # joins it ("join", kitchen only).  A page picks its target with ?room=/…"room".
 SONOS_TARGETS = {
     "house":   {"ip": SONOS_IP,       "uuid": SONOS_UUID,                 "join": None},  # whole-house: music from the lounge
-    "kitchen": {"ip": SONOS_IP,       "uuid": SONOS_UUID,                 "join": KITCHEN_IP},
+    "kitchen": {"ip": KITCHEN_IP,     "uuid": KITCHEN_UUID,               "join": None},  # kitchen page: its own pair only
     "bedroom": {"ip": "192.168.86.156", "uuid": "RINCON_48A6B84B8E5401400", "join": "192.168.86.43"},  # Office joins bedroom by default
     "bathroom": {"ip": "192.168.86.159", "uuid": "RINCON_542A1BFC18E601400", "join": None},  # stereo pair (.159 primary, .63 satellite)
 }
@@ -379,6 +380,38 @@ class Handler(SimpleHTTPRequestHandler):
             ips = re.findall(r'<ZoneGroupMember[^>]*Location="http://([\d.]+):1400', body)
             out.append((coord, ips))
         return out
+
+    def _is_solo(self):
+        """True if this room is already playing alone: the group holding its
+        speaker is coordinated by this room AND has no *visible* member other
+        than this room's own speaker.  Bonded stereo satellites are Invisible=1,
+        so they don't count as another room."""
+        env = ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+               's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
+               '<u:GetZoneGroupState xmlns:u="urn:schemas-upnp-org:service:ZoneGroupTopology:1"></u:GetZoneGroupState>'
+               '</s:Body></s:Envelope>')
+        req = urllib.request.Request("http://%s:1400/ZoneGroupTopology/Control" % self.s_ip, data=env.encode(),
+            headers={"Content-Type": 'text/xml; charset="utf-8"',
+                     "SOAPAction": '"urn:schemas-upnp-org:service:ZoneGroupTopology:1#GetZoneGroupState"'})
+        xml = urllib.request.urlopen(req, timeout=6).read().decode("utf-8", "ignore")
+        m = re.search(r"<ZoneGroupState>(.*?)</ZoneGroupState>", xml, re.S)
+        state = html.unescape(m.group(1)) if m else ""
+        for coord, body in re.findall(r'<ZoneGroup[^>]*Coordinator="([^"]+)"[^>]*>(.*?)</ZoneGroup>', state, re.S):
+            members = re.findall(r'<ZoneGroupMember\s([^>]*?)/?>', body)
+            all_ips, visible_ips = [], []
+            for mm in members:
+                ipm = re.search(r'Location="http://([\d.]+):1400', mm)
+                if not ipm:
+                    continue
+                all_ips.append(ipm.group(1))
+                invm = re.search(r'Invisible="(\d)"', mm)
+                if not (invm and invm.group(1) == "1"):
+                    visible_ips.append(ipm.group(1))
+            if self.s_ip in all_ips:                        # this is our group
+                if coord != self.s_uuid:
+                    return False                            # we're a member of another room's group
+                return all(ip == self.s_ip for ip in visible_ips)   # only us is visible -> alone
+        return False
 
     def _realign_to_coordinator(self):
         """If this room's speaker is currently a MEMBER of another room's group
@@ -863,10 +896,18 @@ class Handler(SimpleHTTPRequestHandler):
         # room's own zone, so nothing else is grouped in.  POST /sonos/isolate
         if self.path == "/sonos/isolate":
             try:
+                if self._is_solo():                   # already alone -> nothing to do
+                    self._json({"ok": True, "solo": True, "ungrouped": False})
+                    return
                 keep = set(filter(None, [self.s_ip, self.s_join]))   # this room's own speakers
+                # break this room's coordinator out of any group it's a member of
+                # (e.g. the kitchen pair detaching from the lounge), so it plays alone
+                self._avt_ip(self.s_ip, "BecomeCoordinatorOfStandaloneGroup",
+                    '<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:BecomeCoordinatorOfStandaloneGroup>')
+                # eject anyone else still grouped to this coordinator
                 for coord, ips in self._zone_groups():
                     if coord != self.s_uuid:
-                        continue                      # only touch this room's group
+                        continue
                     for m in ips:
                         if m not in keep:
                             try:
@@ -874,8 +915,8 @@ class Handler(SimpleHTTPRequestHandler):
                                     '<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:BecomeCoordinatorOfStandaloneGroup>')
                             except Exception:
                                 pass
-                self._ensure_kitchen_grouped()        # keep the room's own pair joined
-                self._json({"ok": True})
+                self._ensure_kitchen_grouped()        # re-attach the room's own companion (no-op if none)
+                self._json({"ok": True, "solo": False, "ungrouped": True})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
