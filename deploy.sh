@@ -21,6 +21,7 @@ scp -q -r \
   "$DIR/kitchen" \
   "$DIR/bed" \
   "$DIR/bathroom" \
+  "$DIR/living" \
   "$DIR/assets" \
   "$DIR/server.py" \
   "$DIR/favicon.ico" \

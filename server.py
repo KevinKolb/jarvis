@@ -43,6 +43,7 @@ SONOS_TARGETS = {
     "kitchen": {"ip": KITCHEN_IP,     "uuid": KITCHEN_UUID,               "join": None},  # kitchen page: its own pair only
     "bedroom": {"ip": "192.168.86.156", "uuid": "RINCON_48A6B84B8E5401400", "join": "192.168.86.43"},  # Office joins bedroom by default
     "bathroom": {"ip": "192.168.86.159", "uuid": "RINCON_542A1BFC18E601400", "join": None},  # stereo pair (.159 primary, .63 satellite)
+    "living":  {"ip": "192.168.86.34",  "uuid": "RINCON_48A6B8BA5DB001400", "join": None},  # Living Room home theater (has a TV)
 }
 # Rooms each page can share its audio to (grouped to that page's coordinator).
 ALL_ROOMS = {
@@ -68,6 +69,9 @@ SHARE_ROOMS = {
                 ("Living Room", ALL_ROOMS["Living Room"]),
                 ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
     "bathroom": [("Bedroom", ALL_ROOMS["Bedroom"])],
+    "living": [("Kitchen", ALL_ROOMS["Kitchen"]), ("Lounge", ALL_ROOMS["Lounge"]),
+               ("Bedroom", ALL_ROOMS["Bedroom"]), ("Office", ALL_ROOMS["Office"]),
+               ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
 }
 SONOS_ROOMS = SHARE_ROOMS["kitchen"]        # back-compat alias
 # Share buttons that pull a companion speaker along, so the two move as a unit.
@@ -81,6 +85,18 @@ SHARE_COMPANIONS = {
 # playlist is playing — the queue only exposes the current track).
 STATE = {"playlist": "", "category": ""}   # category = which music row is playing (for next/back)
 # ------------------------------------------------------------------------
+
+ROOM_ALIASES = {
+    "": "kitchen",
+    "bed": "bedroom",
+    "bath": "bathroom",
+    "living room": "living",
+    "whole house": "house",
+}
+
+def room_key(room):
+    key = str(room or "").strip().lower()
+    return ROOM_ALIASES.get(key, key)
 
 # Music buttons live in music.json (editable via /admin). Seeded from this
 # default the first time the server runs.
@@ -139,6 +155,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _set_target(self, room):
         """Point this request at a room's Sonos coordinator (defaults to kitchen)."""
+        room = room_key(room)
         t = SONOS_TARGETS.get(room)
         self.s_room = room if t else "kitchen"
         t = t or SONOS_TARGETS["kitchen"]

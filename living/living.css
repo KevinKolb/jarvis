@@ -1,0 +1,498 @@
+/* =========================================================
+   Bedroom — "Sunset Motel" theme (exclusive to this page).
+   Loaded after assets/styles.css, so it overrides the shared
+   brutalist look for the bedroom only.
+
+   Softer + warmer than the rest of the app: rounded corners,
+   ambient shadows (no hard offset blocks), dusk palette.
+
+   IMPORTANT — left untouched on purpose (dynamic colors):
+     • the page/hero tint set by the LIGHTS  (inline on <body>)
+     • the room-nav pill tint set by each room's lights
+     • the album-art accent  (--art-accent / --art-ink /
+       --art-accent-soft)  → art border, playbar, share "on",
+       volume track, etc.
+     • the ROYGBIV light swatches
+   Only static "chrome" (surfaces, buttons, borders, text) is themed.
+   ========================================================= */
+
+:root {
+  --paper:   #383838;   /* page background: our gray */
+  --surface: #383838;   /* cards / control boxes: our gray */
+  --ink:     #f5f5f4;   /* text: near-white */
+  --muted:   #9a9a9a;   /* secondary text: neutral gray */
+  --edge:    #3a3a3a;   /* borders: neutral gray */
+
+  /* accents pulled from the light color swatches */
+  --lights:  #fdd835;   /* Yellow swatch */
+  --music:   #1e88e5;   /* Blue swatch */
+
+  /* ambient shadows instead of hard offset blocks */
+  --sh:    0 8px 22px rgba(0, 0, 0, 0.42);
+  --sh-lg: 0 12px 30px rgba(0, 0, 0, 0.50);
+  --sh-sm: 0 4px 12px rgba(0, 0, 0, 0.34);
+
+  color-scheme: dark;   /* the bedroom stays in its warm dark theme */
+}
+
+/* ---------- soften the brutalist shapes ---------- */
+
+.light-tools,
+.card,
+.qr { border-width: 1.5px; border-radius: 18px; }
+
+/* Lights section control box: white border */
+.theme-lights .light-tools { border-color: #ffffff; }
+/* Music card: no container box — content free-floats under the swipe button */
+.theme-music .light-tools {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+/* TV → Podcasts grouped in their own container */
+.chan-box {
+  margin-top: 0.9rem;
+  padding: 0.85rem 0.95rem;
+  border: 1.5px solid #5a5a5a;
+  border-radius: 18px;
+}
+/* TV mode: fill = hue lights color (art-accent becomes the light color in TV mode), border white */
+.btn-tv {
+  background: var(--art-accent);
+  color: var(--art-ink);
+  border-color: #ffffff;
+}
+
+/* big buttons (Engage, hub-off, TV mode) */
+.btn { border-width: 1.5px; border-radius: 14px; }
+.btn:hover  { transform: translateY(-2px); box-shadow: var(--sh-lg); }
+.btn:active { transform: translateY(1px);  box-shadow: var(--sh-sm); }
+
+/* Engage toggle: black border, same 3px width as the selection rings */
+.btn-toggle { border-color: #000000; border-width: 3px; }
+/* neutral "off" state on the Engage toggle */
+.btn-toggle[data-state="off"] { background: #222222; color: #f5f5f4; }
+
+/* OFF buttons (Bed / BOH / House): surface fill (like the Home button), white border */
+.btn-house-off {
+  background: var(--surface);
+  color: #f5f5f4;
+  border-color: #ffffff;
+}
+/* grayed out when the action would do nothing (all target lights already off) */
+.btn-house-off:disabled {
+  background: var(--surface);
+  color: #6f6f6f;
+  border-color: #3d3d3d;
+  opacity: 0.5;
+  box-shadow: none;
+  cursor: not-allowed;
+  pointer-events: none;   /* kill the hover/active lift while disabled */
+}
+
+/* pill-shaped channel + share buttons */
+/* Music buttons all match: art-color fill, white border, rounded-rect shape */
+.chan-btn {
+  border-width: 1.5px;
+  border-radius: 14px;
+  border-color: #ffffff;
+  background: var(--art-accent);
+  color: var(--art-ink);
+}
+.chan-btn:hover  { transform: translateY(-2px); box-shadow: var(--sh); }
+.chan-btn:active { transform: translateY(1px); }
+.chan-btn.sel { box-shadow: inset 0 0 0 2.5px rgba(0, 0, 0, 0.55); }   /* currently playing */
+/* Share ("Play In") buttons: gray fill until the room is actually sharing */
+.chan-btn.share-btn:not(.on) { background: var(--surface); color: var(--ink); }
+
+/* volume / brightness end caps */
+.bri-end { border-width: 1.5px; border-radius: 11px; }
+
+/* color swatches: one joined strip you slide across (still 7 colors).
+   The border + rounded corners live on a non-scrolling wrapper so they stay
+   crisp and uniform; the inner strip scrolls and is clipped to the rounding. */
+.swatch-strip {
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  touch-action: none;              /* slide across to pick; the strip never scrolls */
+}
+.swatches {
+  display: flex;
+  gap: 0;                          /* joined — swatches touch edge to edge */
+  flex-wrap: nowrap;
+  touch-action: none;
+}
+.swatch {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;                /* square so neighbors join seamlessly */
+  box-shadow: none;
+}
+.swatch:hover,
+.swatch:active { transform: none; box-shadow: none; }
+/* selection ring: black for every color */
+.swatch.sel,
+.bri-box.sel { outline: none; box-shadow: inset 0 0 0 3px #000000; z-index: 1; }
+
+/* =========================================================
+   Lights card — 3 columns: 1 COLOR · 2 BRIGHT · 3 ON
+   Colors and brightness are vertical stacks; Engage fills its cell.
+   ========================================================= */
+.light-tools.lights-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.l3-cell { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.l3-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffffff;
+  padding-left: 2px;
+}
+.l3-num { font-size: 0.74rem; color: #ffffff; }
+
+/* the two picker columns: 7 joined boxes, top -> bottom */
+.lights-3 .swatches,
+.lights-3 .bri-boxes {
+  display: flex;                   /* both columns are flex stacks */
+  flex-direction: column;
+  height: 301px;                   /* 7 boxes tall (~43px each); Engage stretches to match */
+  gap: 0;
+  overflow: hidden;
+  touch-action: none;              /* tap / slide to pick; never scroll */
+}
+.lights-3 .swatch,
+.lights-3 .bri-box {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+}
+.bri-box {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  /* % text: no border; white, or black when White is the chosen color (set in JS) */
+  color: #ffffff;
+}
+
+/* Engage fills its whole cell */
+/* Engage = a wall light switch: dark faceplate + a color paddle that slides
+   up (on) / down (off), with the text on the paddle. */
+.l3-engage .btn-toggle {
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 12px;
+  background: #121212 !important;   /* the faceplate */
+  touch-action: none;              /* capture up/down swipes instead of scrolling */
+}
+.engage-paddle {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 27%;                          /* OFF: paddle rests at the bottom */
+  height: 69%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  border-radius: 10px;
+  line-height: 1.05;
+  text-align: center;
+  background: #444444;               /* JS sets this to the light-color shade */
+  transition: top 0.24s cubic-bezier(0.34, 1.1, 0.5, 1);
+}
+.btn-toggle.engaged .engage-paddle { top: 4%; }   /* ON: paddle slides up */
+/* text on the paddle */
+.engage-pct {
+  font-family: "Space Mono", monospace;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.engage-color {
+  font-family: "Space Mono", monospace;
+  font-size: 1.45rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  /* color = the actual chosen color (set in JS), with a white outline */
+  -webkit-text-stroke: 2.25px #ffffff;
+  paint-order: stroke fill;
+}
+.engage-cta {
+  font-family: "Space Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+/* off/down: show "Swipe Up Here For · #% · color"; on/up: show "Swipe Down For Off" */
+.btn-toggle:not(.engaged) .engage-down { display: none; }
+.btn-toggle.engaged .engage-up { display: none; }
+
+/* top room-nav pills (their light-color tint is inline, so only shape changes) */
+.room-nav a { border-width: 1.5px; border-radius: 12px; }
+/* room-nav moved to the page footer — centered, bigger tap targets */
+.room-nav-footer {
+  margin-top: 2.4rem;
+  margin-bottom: 0;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;                 /* stack onto more rows when they don't fit */
+  overflow-x: visible;
+}
+.room-nav-footer a { min-height: 44px; padding: 0.5rem 0.8rem; border-color: #ffffff; }
+/* all nav buttons share the surface shade (override the per-room light tint) */
+.room-nav-footer a { background: var(--surface) !important; color: var(--ink) !important; }
+/* current room (Bedroom) is present but grayed out + non-interactive, like a disabled OFF button */
+.room-nav-footer a[aria-current="page"] {
+  opacity: 0.5;
+  color: #6f6f6f !important;
+  border-color: #3d3d3d;
+  pointer-events: none;
+  cursor: default;
+}
+
+/* ---------- mobile polish ---------- */
+/* clear the iOS home indicator at the bottom */
+.page { padding-bottom: max(3.5rem, calc(2.2rem + env(safe-area-inset-bottom))); }
+/* no blue tap flash; no accidental text selection while tapping/dragging controls */
+.btn, .swatch, .bri-box, .swipe-music, .room-nav a, .chan-btn, .deck-tab {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* keep swipes from triggering pull-to-refresh / scroll chaining */
+body { overscroll-behavior: contain; }
+
+/* ---------- toast: float in the upper-right, card-style to match the page ---------- */
+.toast {
+  left: auto;
+  right: max(0.9rem, calc(0.9rem + env(safe-area-inset-right)));
+  top: max(0.9rem, calc(0.9rem + env(safe-area-inset-top)));
+  bottom: auto;
+  transform: translateY(-160%);      /* hidden: off the top edge */
+  max-width: 300px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid #ffffff;
+  border-radius: 12px;
+}
+.toast.show { transform: translateY(0); }
+.toast .icon { color: var(--ink); }
+/* channel pills: 44px tap target */
+.chan-btn { min-height: 44px; }
+
+/* ---------- palette: black / white / gray + light swatch + album-art only ----------
+   Neutralize the few stray theme accents that leaked onto this page. */
+.toast .icon { color: inherit; }                          /* was yellow */
+:focus-visible { outline-color: #ffffff; }                /* was blue */
+.chan-btn:active { background: var(--art-accent); color: var(--art-ink); }  /* keep art color on tap */
+
+/* full-width "swipe here for …" buttons that jump to the other deck */
+.swipe-music,
+.swipe-lights {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.5rem;
+  justify-content: center;
+  gap: 0.55rem;
+  text-align: center;
+  background: var(--surface);          /* same shade as the Home button */
+  color: #f5f5f4;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.swipe-music svg,
+.swipe-lights svg { width: 18px; height: 18px; flex: none; }
+.swipe-music  { border-color: #ffffff; }          /* white border */
+/* one dynamic button: show the music note on Lights, the bulb on Music */
+.swipe-music .ico-lights { display: none; }
+.swipe-music.show-lights .ico-music { display: none; }
+.swipe-music.show-lights .ico-lights { display: inline-flex; }
+/* white <<< / >>> markers flanking the text */
+.swipe-arrows { color: #ffffff; font-weight: 700; letter-spacing: 0.06em; }
+
+/* album-art area: round the corners, thin the frame — color stays --art-accent */
+.np-art,
+.np-art-loading,
+.np-art-tv { border-radius: 14px; }
+
+/* album art + a vertical volume column beside it */
+.np-row { display: flex; gap: 0.5rem; align-items: stretch; }
+.np-row .np-art-wrap { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+.vol-boxes {
+  flex: 0 0 68px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  touch-action: none;              /* tap / slide to set; never scroll */
+}
+.vol-box {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #ffffff;
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.vol-box.sel { box-shadow: inset 0 0 0 3px #000000; z-index: 1; }
+
+/* Now Playing as a banner overlaying the TOP of the album art —
+   same tint as the play overlay at the bottom (album-art accent). */
+.np-art-wrap .np-status {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: 20%;                     /* same as the play overlay at the bottom */
+  margin: 0;
+  padding: 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 14px 14px 0 0;
+  background: var(--art-accent-soft, rgba(154, 154, 154, 0.34));
+  color: var(--art-ink, #ffffff);
+  pointer-events: none;            /* taps pass through to the art */
+  text-align: left;
+  transition: background-color 240ms ease;
+}
+/* overlay text: white with a black outline */
+.np-art-wrap .np-primary,
+.np-art-wrap .np-secondary,
+.np-art-wrap .np-tertiary {
+  color: #ffffff;
+  -webkit-text-stroke: 1px #000000;
+  paint-order: stroke fill;
+}
+/* every line after line 1 looks the same (match np-secondary's size/weight) */
+.np-art-wrap .np-secondary,
+.np-art-wrap .np-tertiary {
+  opacity: 0.9;
+  font-weight: 400;
+  font-size: 0.72rem;
+  margin-top: 0.2rem;
+}
+.np-art-wrap .np-tertiary:empty { display: none; }
+/* transport buttons: white icons with a black outline */
+.np-playbar button { color: #ffffff; }
+.np-playbar button svg {
+  filter: drop-shadow(1px 0 0 #000) drop-shadow(-1px 0 0 #000)
+          drop-shadow(0 1px 0 #000) drop-shadow(0 -1px 0 #000);
+}
+.np-art { border-width: 2px; }
+.np-playbar { border-radius: 0 0 12px 12px; }   /* bg stays --art-accent-soft */
+
+/* the SpamNet note in the footer */
+.wifi-note { border-width: 1.5px; border-radius: 14px; }
+
+/* softer, warmer hero title — centered, and sized to fit "BED LIGHTS 100%"
+   on a portrait iPhone without overflowing */
+.kitchen-title {
+  letter-spacing: 0.01em;
+  justify-content: flex-start;     /* left-aligned so it doesn't shift as the width changes */
+  text-align: left;
+  font-size: clamp(1.4rem, 6.5vw, 2.6rem);
+  min-width: 0;
+  white-space: nowrap;
+  /* white outline (JS flips it to black when the light color is white) */
+  -webkit-text-stroke: 2px #ffffff;
+  paint-order: stroke fill;
+}
+.kitchen-head { text-align: left; }
+/* the deck word ("Lights"/"Music") is a separate flex item — restore the space */
+/* room name is the big word; mode + % ride smaller alongside it (mobile hierarchy) */
+.kitchen-title #hero-deck,
+.kitchen-title #hero-status {
+  font-size: 0.5em;
+  -webkit-text-stroke-width: 1px;
+  align-self: center;
+}
+.kitchen-title #hero-deck { margin-left: 0.45em; }
+.kitchen-title #hero-status:not(:empty) { margin-left: 0.4em; }
+
+/* the OFF buttons (Bed / BOH / House) sit side by side, equal width —
+   free-floating, no container box */
+.off-row { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
+.off-row .btn-house-off {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+  min-height: 44px;                /* match the Lights/Music tab height */
+  padding: 0.5rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+
+/* =========================================================
+   Lights + Music decks — one shown at a time; swipe/buttons toggle
+   ========================================================= */
+
+/* One deck shown at a time; swipe left/right or the tabs toggle between them,
+   with a smooth slide-in. Only the active deck is in flow (keeps heights tight). */
+.room-decks {
+  display: block;
+  margin-bottom: 1.5rem;
+  overflow: hidden;                /* clip the slide-in so nothing spills sideways */
+}
+.room-decks .deck {
+  margin-bottom: 0;               /* .section's own margin lives on .room-decks now */
+  display: none;
+}
+.room-decks .deck.deck-active { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .room-decks .deck.deck-active { animation: deckIn 0.28s cubic-bezier(0.33, 0, 0.2, 1); }
+  .room-decks.from-left .deck.deck-active { animation-name: deckInLeft; }
+}
+@keyframes deckIn {      /* enters from the right */
+  from { opacity: 0; transform: translateX(26px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes deckInLeft {  /* enters from the left */
+  from { opacity: 0; transform: translateX(-26px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Always the swipe carousel + Lights/Music toggle — mobile view at every width.
+   (The page itself stays capped at 560px, so one card fills the view on desktop.) */

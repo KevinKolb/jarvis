@@ -7,23 +7,22 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#f4f1e6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#14140f" media="(prefers-color-scheme: dark)">
-  <title>Bedroom · JARVIS</title>
-  <link rel="icon" href="/bed/bed.ico?v=3" sizes="any">
-  <link rel="apple-touch-icon" href="/bed/bed-touch.png?v=3">
-  <meta name="apple-mobile-web-app-title" content="Bedroom">
+  <title>Living Room · JARVIS</title>
+  <link rel="icon" href="/living/living.ico?v=3" sizes="any">
+  <link rel="apple-touch-icon" href="/living/living-touch.png?v=3">
+  <meta name="apple-mobile-web-app-title" content="Living Room">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/styles.css?v=6">
-  <link rel="stylesheet" href="/bed/bed.css?v=6">
+  <link rel="stylesheet" href="/living/living.css?v=6">
 </head>
 <body>
-  <main class="page" data-room="bedroom" data-sonos-room="bedroom"
-        data-hue-bridge="bedroom" data-lights-group="99" data-lights-members="43,44,47,48,49,50,53,54"
-        data-office-lamp="54">
-    <!-- Bed header -->
-    <header class="kitchen-head" id="bedroom-hero">
-      <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>Bedroom <span id="hero-deck">Lights</span><span id="hero-status"></span></h1>
+  <main class="page" data-room="Living Room" data-sonos-room="living"
+        data-hue-bridge="main" data-lights-group="105" data-lights-members="12,13,14,15,16,18,19,40,41">
+    <!-- Living Room header -->
+    <header class="kitchen-head" id="living-hero">
+      <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 11a2 2 0 0 1 2 2v3h16v-3a2 2 0 0 1 2-2 2 2 0 0 0-2 2v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a2 2 0 0 0-2-2Z"/><path d="M4 18v2"/><path d="M20 18v2"/></svg>Living Room <span id="hero-deck">Lights</span><span id="hero-status"></span></h1>
     </header>
 
     <a class="btn swipe-music" id="swipe-deck" href="?deck=music" aria-label="Switch view">
@@ -50,7 +49,7 @@
         </div>
         <div class="l3-cell l3-engage">
           <div class="l3-head"><span class="l3-num">3</span>Swipe On</div>
-          <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle bedroom lights">
+          <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle Living Room lights">
             <span class="engage-paddle">
               <span class="engage-cta engage-up">Swipe Up<br>Here For</span>
               <span class="engage-color engage-up" id="engage-color">White</span>
@@ -63,7 +62,7 @@
 
       <!-- Off buttons: free-floating, no container box -->
       <div class="off-row">
-        <button class="btn btn-house-off" id="room-off" type="button" aria-label="Turn off the bedroom lights"></button>
+        <button class="btn btn-house-off" id="room-off" type="button" aria-label="Turn off the Living Room lights"></button>
         <button class="btn btn-house-off" id="house-off" type="button" aria-label="Turn off all lights on this hub"></button>
         <button class="btn btn-house-off btn-house-off-all" id="house-off-all" type="button" aria-label="Turn off every light in the house">WHOLE HOUSE OFF</button>
       </div>
@@ -109,7 +108,7 @@
         <div class="chan-box">
         <div class="tool-row">
           <span class="tool-label">TV</span>
-          <button class="btn btn-tv" id="tv-mode" type="button" aria-label="Switch bedroom Sonos to TV audio">
+          <button class="btn btn-tv" id="tv-mode" type="button" aria-label="Switch Living Room Sonos to TV audio">
             <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/></svg>
             TV mode
           </button>
@@ -148,8 +147,8 @@
     <nav class="room-nav room-nav-footer" aria-label="Rooms">
       <a class="room-nav-home" href="/" aria-label="Whole house"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>Whole House</a>
       <a href="/kitchen/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M5 2v20"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>Kitchen</a>
-      <a href="/bed/" aria-current="page" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bedroom</a>
-      <a href="/living/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 11a2 2 0 0 1 2 2v3h16v-3a2 2 0 0 1 2-2 2 2 0 0 0-2 2v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a2 2 0 0 0-2-2Z"/><path d="M4 18v2"/><path d="M20 18v2"/></svg>Living Room</a>
+      <a href="/bed/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M12 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Bedroom</a>
+      <a href="/living/" aria-current="page" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 11a2 2 0 0 1 2 2v3h16v-3a2 2 0 0 1 2-2 2 2 0 0 0-2 2v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a2 2 0 0 0-2-2Z"/><path d="M4 18v2"/><path d="M20 18v2"/></svg>Living Room</a>
       <a href="/bathroom/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12V6a2 2 0 0 1 3.5-1.3L9 6"/><path d="M2 12h20v2a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z"/><path d="M6 19l-1 2M18 19l1 2"/></svg>Bathroom</a>
     </nav>
   </main>

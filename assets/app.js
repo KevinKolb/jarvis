@@ -6,6 +6,32 @@
    the phone walks away.
    ========================================================= */
 
+const PI_ORIGIN = "http://192.168.86.147";
+const PI_ROOM_PATHS = ["kitchen", "bed", "bathroom", "living"];
+
+function piPagePath() {
+  const path = decodeURIComponent(window.location.pathname || "/").toLowerCase();
+  if (path.indexOf("/admin.html") !== -1) return "/admin.html";
+  for (const room of PI_ROOM_PATHS) {
+    if (path.indexOf("/" + room + "/") !== -1 || path.endsWith("/" + room)) {
+      return "/" + room + "/";
+    }
+  }
+  return "/";
+}
+
+function piUrl(path) {
+  if (!path) return PI_ORIGIN + "/";
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path;
+  return PI_ORIGIN + (path.charAt(0) === "/" ? path : "/" + path);
+}
+
+(function redirectToPiOrigin() {
+  if (window.location.origin === PI_ORIGIN) return;
+  const target = PI_ORIGIN + piPagePath() + window.location.search + window.location.hash;
+  if (window.location.href !== target) window.location.replace(target);
+})();
+
 const CONFIG = {
   // SiriusXM channels shown under "Kitchen speakers".
   // `shortcut` is the exact name of the iOS Shortcut to run.
@@ -83,7 +109,7 @@ function runShortcut(name) {
 
 /* ---------- Fire a silent background request (no app switch) ---------- */
 function runFetch(req) {
-  fetch(req.url, {
+  fetch(piUrl(req.url), {
     method: req.method || "POST",
     headers: req.body ? { "Content-Type": "application/json" } : undefined,
     body: req.body || undefined,
@@ -95,7 +121,7 @@ function runFetch(req) {
 /* ---------- Ask the Pi relay to talk to the Hue bridge ---------- */
 function runHueProxy(hue) {
   HUE_WRITE.forEach((bridge) => {       // "all" = send to both hubs
-    fetch("/hue", {                     // same-origin: the Pi, not the bridge
+    fetch(piUrl("/hue"), {              // Pi, not the bridge
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.assign({ bridge: bridge }, hue)),
@@ -105,9 +131,20 @@ function runHueProxy(hue) {
 }
 
 /* ---------- Per-room config (set by data-* on .page) ---------- */
+function sonosRoomKey(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return ({
+    "": "kitchen",
+    "bed": "bedroom",
+    "bath": "bathroom",
+    "living room": "living",
+    "whole house": "house",
+  })[key] || key;
+}
+
 const PAGE = document.querySelector(".page") || document.body;
 const CFG = PAGE.dataset || {};
-const ROOM = CFG.sonosRoom || "kitchen";                 // Sonos target room
+const ROOM = sonosRoomKey(CFG.sonosRoom || "kitchen");   // Sonos target room key
 const ROOM_LABEL = (CFG.room || ROOM).replace(/^\w/, (c) => c.toUpperCase());  // "Bathroom"
 const HUE_BRIDGE = CFG.hueBridge || "main";              // which Hue bridge ("all" = both)
 const HUE_ALL_BRIDGES = ["main", "bedroom"];
@@ -254,7 +291,7 @@ function renderNP() {
   }
 }
 function setSonosVolume(level) {
-  fetch("/sonos/volume", { method: "POST", headers: { "Content-Type": "application/json" },
+  fetch(piUrl("/sonos/volume"), { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ level: level }), keepalive: true }).catch(() => {});
 }
 let lastArtUrl = "";
@@ -296,7 +333,7 @@ function setArtAccent(color) {
   if (typeof updateHeaderColor === "function") updateHeaderColor();   // Music header follows art
 }
 function updateSonos() {
-  fetch("/sonos/state" + RQ, { cache: "no-store" })
+  fetch(piUrl("/sonos/state" + RQ), { cache: "no-store" })
     .then((r) => r.json())
     .then((d) => {
       if (!d || d.error) return;
@@ -339,7 +376,7 @@ function updateSonos() {
             probe.crossOrigin = "anonymous";
             probe.onload = () => setArtAccent(extractArtColor(probe));
             probe.onerror = () => setArtAccent(null);
-            probe.src = "/art?u=" + encodeURIComponent(d.art);
+            probe.src = piUrl("/art?u=" + encodeURIComponent(d.art));
           }
         } else {                               // no art -> show the track / source name
           lastArtUrl = "";
@@ -355,25 +392,25 @@ function updateSonos() {
     .catch(() => {});
 }
 function playFavorite(fav, label, shuffle) {
-  fetch("/sonos/favorite", { method: "POST", headers: { "Content-Type": "application/json" },
+  fetch(piUrl("/sonos/favorite"), { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ name: fav, shuffle: !!shuffle }), keepalive: true }).catch(() => {});
   toast("Now playing " + label);
   window.setTimeout(updateSonos, 1500);
 }
 function playApple(apple, label) {   // apple = {kind, id, title}
-  fetch("/sonos/apple", { method: "POST", headers: { "Content-Type": "application/json" },
+  fetch(piUrl("/sonos/apple"), { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom(apple), keepalive: true }).catch(() => {});
   toast("Now playing " + label);
   window.setTimeout(updateSonos, 1500);
 }
 function playStream(url, label) {   // direct stream URL (like Sonos "Play a URL")
-  fetch("/sonos/uri", { method: "POST", headers: { "Content-Type": "application/json" },
+  fetch(piUrl("/sonos/uri"), { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ url: url, title: label }), keepalive: true }).catch(() => {});
   toast("Now playing " + label);
   window.setTimeout(updateSonos, 1500);
 }
 function playPodcast(feed, label) {   // newest episode from an Apple Podcasts link / RSS feed
-  fetch("/sonos/podcast", { method: "POST", headers: { "Content-Type": "application/json" },
+  fetch(piUrl("/sonos/podcast"), { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ feed: feed }), keepalive: true }).catch(() => {});
   toast("Now playing latest " + label);
   window.setTimeout(updateSonos, 2500);
@@ -383,10 +420,10 @@ function renderShare() {
   if (!host) return;
   function setRoom(btn, name, join) {
     btn.classList.toggle("on", join);
-    fetch("/sonos/group", { method: "POST", headers: { "Content-Type": "application/json" },
+    fetch(piUrl("/sonos/group"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: withRoom({ room: name, join: join }), keepalive: true }).catch(() => {});
   }
-  fetch("/sonos/rooms" + RQ, { cache: "no-store" })
+  fetch(piUrl("/sonos/rooms" + RQ), { cache: "no-store" })
     .then((r) => r.json())
     .then((d) => {
       if (!d || !d.rooms) return;
@@ -499,7 +536,7 @@ function bindPlayPause() {
   if (!btn) return;
   btn.addEventListener("click", () => {
     const action = npPlaying ? "pause" : "play";
-    fetch("/sonos/transport", { method: "POST", headers: { "Content-Type": "application/json" },
+    fetch(piUrl("/sonos/transport"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: withRoom({ action: action }), keepalive: true }).catch(() => {});
     npPlaying = !npPlaying;          // optimistic; the next poll confirms
     updatePlayPause();
@@ -512,7 +549,7 @@ function bindSkip() {
     const b = document.getElementById(id);
     if (!b) return;
     b.addEventListener("click", () => {
-      fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
+      fetch(piUrl(path), { method: "POST", headers: { "Content-Type": "application/json" },
         body: withRoom({}), keepalive: true }).catch(() => {});
       window.setTimeout(updateSonos, 700);
     });
@@ -552,14 +589,14 @@ function bindTv() {   // bedroom only: switch the room's Sonos to its TV input
   const btn = document.getElementById("tv-mode");
   if (!btn) return;
   btn.addEventListener("click", () => {
-    fetch("/sonos/tv", { method: "POST", headers: { "Content-Type": "application/json" },
+    fetch(piUrl("/sonos/tv"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: withRoom({}), keepalive: true }).catch(() => {});
     toast("Switching to TV audio…");
     window.setTimeout(updateSonos, 2000);
   });
 }
 function renderMusic() {
-  fetch("/music", { cache: "no-store" })
+  fetch(piUrl("/music"), { cache: "no-store" })
     .then((r) => r.json())
     .then((M) => renderMusicRows(M || MUSIC))
     .catch(() => renderMusicRows(MUSIC));
@@ -616,7 +653,7 @@ function bindVolume() {
   if (bmute) bmute.addEventListener("click", () => {
     sonosMuted = !sonosMuted;
     renderVol(); renderNP();
-    fetch("/sonos/mute", { method: "POST", headers: { "Content-Type": "application/json" },
+    fetch(piUrl("/sonos/mute"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: withRoom({ mute: sonosMuted }), keepalive: true }).catch(() => {});
   });
 }
@@ -625,7 +662,7 @@ function bindVolume() {
 const VOL_PRESETS = [100, 75, 50, 25, 10, 5, 0];   // top -> bottom
 
 function sendMute(on) {
-  fetch("/sonos/mute", { method: "POST", headers: { "Content-Type": "application/json" },
+  fetch(piUrl("/sonos/mute"), { method: "POST", headers: { "Content-Type": "application/json" },
     body: withRoom({ mute: !!on }), keepalive: true }).catch(() => {});
 }
 // Paint each box a shade of the album-art accent by its level, and mark the
@@ -849,7 +886,7 @@ function bridgeList(bridge) {
   return bridge === "all" ? HUE_ALL_BRIDGES : [bridge || "main"];
 }
 function hueGet(bridge, path) {
-  return fetch("/hue/" + bridge + path, { cache: "no-store" }).then((r) => {
+  return fetch(piUrl("/hue/" + bridge + path), { cache: "no-store" }).then((r) => {
     if (!r.ok) throw new Error("Hue " + bridge + " " + path + " " + r.status);
     return r.json();
   });
@@ -916,9 +953,10 @@ function tintRoomCard(card) {
 // Light config per room page, keyed by its URL — used to tint the top room-nav
 // pills with each room's own live light color (same as the home tiles).
 const ROOM_LIGHTS = {
-  "/kitchen/":  { bridge: "main",    group: "82", members: "22,21,20,63,62" },
-  "/bed/":      { bridge: "bedroom", group: "99", members: "43,44,47,48,49,50,53,54" },
-  "/bathroom/": { bridge: "bedroom", group: "88", members: "22,24,20,21,34,35" },
+  "/kitchen/":  { bridge: "main",    group: "82",  members: "22,21,20,63,62" },
+  "/bed/":      { bridge: "bedroom", group: "99",  members: "43,44,47,48,49,50,53,54" },
+  "/bathroom/": { bridge: "bedroom", group: "88",  members: "22,24,20,21,34,35" },
+  "/living/":   { bridge: "main",    group: "105", members: "12,13,14,15,16,18,19,40,41" },
 };
 function initNavLights() {   // stamp each nav pill with its room's light config
   document.querySelectorAll(".room-nav a[href]").forEach((a) => {
@@ -1164,7 +1202,7 @@ function bindHouseOffAll() {
   btn.textContent = "WHOLE HOUSE OFF";
   btn.addEventListener("click", () => {
     HUE_ALL_BRIDGES.forEach((bridge) => {
-      fetch("/hue", { method: "POST", headers: { "Content-Type": "application/json" },
+      fetch(piUrl("/hue"), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bridge: bridge, path: "/groups/0/action", body: { on: false } }),
         keepalive: true }).catch(() => {});
     });
@@ -1512,13 +1550,15 @@ document.addEventListener("DOMContentLoaded", () => {
   bindSkip();
   if (!document.querySelector(".room-grid")) {
     updateLightsStatus();      // room page: its own lights section + hero tint
+    window.setInterval(updateLightsStatus, 8000);   // keep status + OFF-button enabled states fresh
+    window.addEventListener("visibilitychange", () => { if (!document.hidden) updateLightsStatus(); });
   }
   initNavLights();             // give the top nav pills their room light configs
   tintHomeCards();             // tint home tiles AND room-nav pills by room light color
   window.setInterval(tintHomeCards, 10000);
   window.addEventListener("visibilitychange", () => { if (!document.hidden) tintHomeCards(); });
   if (CFG.sonosSolo) {                        // this room plays alone — eject anyone grouped in
-    fetch("/sonos/isolate", { method: "POST", headers: { "Content-Type": "application/json" },
+    fetch(piUrl("/sonos/isolate"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: withRoom({}), keepalive: true }).catch(() => {});
   }
   updateSonos();

@@ -8,7 +8,7 @@ A phone-first home control site styled as **Jarvis**, a residence butler. Scan a
 - `kitchen/index.html` — the butler menu for the kitchen: greeting, Lights, SiriusXM channels, Podcasts, and a live Now Playing bar. A QR code to this page sits at the bottom.
 - `assets/styles.css` — the shared look (warm hospitality theme, light + dark).
 - `assets/app.js` — all wiring. Edit the `CONFIG` block to match your own Shortcuts and channels.
-- `assets/kitchen-qr.svg` — QR code encoding `https://KevinKolb.github.io/kitchen`.
+- `assets/kitchen-qr.svg` — QR code encoding the Pi-hosted kitchen page.
 
 ## How the controls work
 
@@ -22,4 +22,4 @@ Each Shortcut should tell Alexa (or your speaker platform) to run the action, ke
 
 ## Hosting
 
-Deployed at **https://KevinKolb.github.io/** with the kitchen at **https://KevinKolb.github.io/kitchen**. Point the kitchen QR sticker at that URL.
+Run from the Raspberry Pi at **http://192.168.86.147/** with the kitchen at **http://192.168.86.147/kitchen/**. Room pages redirect back to that Pi origin when opened from another host, and all hardware calls are built against the Pi URL.

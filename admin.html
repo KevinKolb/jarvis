@@ -129,6 +129,18 @@ hostname -I                     # the Pi's IP address</pre>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
+    const PI_ORIGIN = "http://192.168.86.147";
+    function piUrl(path) {
+      if (!path) return PI_ORIGIN + "/";
+      if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path;
+      return PI_ORIGIN + (path.charAt(0) === "/" ? path : "/" + path);
+    }
+    (function redirectToPiOrigin() {
+      if (window.location.origin === PI_ORIGIN) return;
+      const target = PI_ORIGIN + "/admin.html" + window.location.search + window.location.hash;
+      if (window.location.href !== target) window.location.replace(target);
+    })();
+
     const $ = (id) => document.getElementById(id);
     const SECTIONS = ["radio", "artists", "jukebox", "albums", "playlists", "podcasts"];
     let toastT;
@@ -190,7 +202,7 @@ hostname -I                     # the Pi's IP address</pre>
         item = { label: label, fav: u };
       }
       if ($("a-shuffle").checked) item.shuffle = true;
-      fetch("/music/add", { method: "POST", headers: { "Content-Type": "application/json" },
+      fetch(piUrl("/music/add"), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ section: section, item: item }) })
         .then((r) => r.json())
         .then(() => {
@@ -201,7 +213,7 @@ hostname -I                     # the Pi's IP address</pre>
         .catch(() => toast("Couldn't add — is the Pi reachable?"));
     });
     function loadList() {
-      fetch("/music", { cache: "no-store" }).then((r) => r.json()).then((cfg) => {
+      fetch(piUrl("/music"), { cache: "no-store" }).then((r) => r.json()).then((cfg) => {
         const host = $("a-list"); host.innerHTML = "";
         SECTIONS.forEach((sec) => {
           const items = cfg[sec] || [];
@@ -217,7 +229,7 @@ hostname -I                     # the Pi's IP address</pre>
             nm.textContent = it.label + "  ·  " + (it.apple ? (it.apple.kind + " " + it.apple.id) : it.podcast ? "podcast" : it.url ? "url" : ("fav: " + it.fav)) + (it.shuffle ? "  ·  shuffle" : "");
             const rm = document.createElement("button"); rm.className = "admin-rm"; rm.textContent = "×"; rm.title = "Remove";
             rm.addEventListener("click", () => {
-              fetch("/music/remove", { method: "POST", headers: { "Content-Type": "application/json" },
+              fetch(piUrl("/music/remove"), { method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ section: sec, index: idx }) }).then(() => { toast("Removed."); loadList(); });
             });
             row.appendChild(nm); row.appendChild(rm); card.appendChild(row);
