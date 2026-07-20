@@ -136,6 +136,8 @@
 /* selection ring: black for every color */
 .swatch.sel,
 .bri-box.sel { outline: none; box-shadow: inset 0 0 0 3px #000000; z-index: 1; }
+/* the OFF box gets a white selection ring only when it's the chosen pick */
+.bri-box[data-pct="0"].sel { box-shadow: inset 0 0 0 3px #ffffff; z-index: 1; }
 
 /* =========================================================
    Lights card — 3 columns: 1 COLOR · 2 BRIGHT · 3 ON
@@ -143,7 +145,7 @@
    ========================================================= */
 .light-tools.lights-3 {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
   align-items: stretch;
 }
@@ -162,12 +164,12 @@
 }
 .l3-num { font-size: 0.74rem; color: #ffffff; }
 
-/* the two picker columns: 7 joined boxes, top -> bottom */
+/* the two picker columns: joined boxes, top -> bottom */
 .lights-3 .swatches,
 .lights-3 .bri-boxes {
   display: flex;                   /* both columns are flex stacks */
   flex-direction: column;
-  height: 301px;                   /* 7 boxes tall (~43px each); Engage stretches to match */
+  height: 344px;                   /* 8 boxes tall (~43px each); Engage stretches to match */
   gap: 0;
   overflow: hidden;
   touch-action: none;              /* tap / slide to pick; never scroll */
@@ -208,53 +210,92 @@
   padding: 0;
   border-radius: 12px;
   background: #121212 !important;   /* the faceplate */
-  touch-action: none;              /* capture up/down swipes instead of scrolling */
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.34);
+  touch-action: manipulation;
+}
+.l3-engage .btn-toggle:hover,
+.l3-engage .btn-toggle:active {
+  transform: none;
+  box-shadow: var(--sh-sm);
 }
 .engage-paddle {
   position: absolute;
-  left: 7%;
-  right: 7%;
-  top: 27%;                          /* OFF: paddle rests at the bottom */
-  height: 69%;
-  display: flex;
+  left: 6%;
+  right: 6%;
+  top: 6%;
+  bottom: 6%;
+  height: auto;
+  display: grid;
+  grid-template-rows: 0.74rem 1.42rem 1rem auto;
+  align-content: center;
+  justify-items: center;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
+  gap: 0.18rem;
+  padding: 0.45rem;
   border-radius: 10px;
-  line-height: 1.05;
+  line-height: 1;
   text-align: center;
   background: #444444;               /* JS sets this to the light-color shade */
-  transition: top 0.24s cubic-bezier(0.34, 1.1, 0.5, 1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  transition: background-color 160ms ease, color 160ms ease;
 }
-.btn-toggle.engaged .engage-paddle { top: 4%; }   /* ON: paddle slides up */
+.btn-toggle.engaged .engage-paddle { top: 6%; }
 /* text on the paddle */
 .engage-pct {
   font-family: "Space Mono", monospace;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 700;
+  line-height: 1;
+  opacity: 0.94;
+}
+.engage-target {
+  max-width: 92%;
+  font-family: "Space Mono", monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .engage-color {
   font-family: "Space Mono", monospace;
-  font-size: 1.45rem;
+  font-size: 1.46rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  /* color = the actual chosen color (set in JS), with a white outline */
-  -webkit-text-stroke: 2.25px #ffffff;
-  paint-order: stroke fill;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+  color: currentColor;
+  -webkit-text-stroke: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
 }
 .engage-cta {
   font-family: "Space Mono", monospace;
-  font-size: 0.62rem;
+  min-height: 0.74rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.1em;
+  line-height: 1;
   text-transform: uppercase;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 /* off/down: show "Swipe Up Here For · #% · color"; on/up: show "Swipe Down For Off" */
-.btn-toggle:not(.engaged) .engage-down { display: none; }
-.btn-toggle.engaged .engage-up { display: none; }
+.btn-toggle .engage-down { display: none; }
+.btn-toggle.engaged .engage-cta { display: block; }
+.btn-toggle.is-current .engage-cta { opacity: 0.76; }
+.btn-toggle.is-off-choice .engage-paddle {
+  grid-template-rows: 0.74rem 1.72rem auto;
+  gap: 0.08rem;
+}
+.btn-toggle.is-off-choice .engage-pct { display: none; }
+.btn-toggle.is-off-choice .engage-color {
+  letter-spacing: 0.08em;
+  line-height: 0.9;
+}
 
 /* top room-nav pills (their light-color tint is inline, so only shape changes) */
 .room-nav a { border-width: 1.5px; border-radius: 12px; }
@@ -339,6 +380,100 @@ body { overscroll-behavior: contain; }
 .swipe-music.show-lights .ico-lights { display: inline-flex; }
 /* white <<< / >>> markers flanking the text */
 .swipe-arrows { color: #ffffff; font-weight: 700; letter-spacing: 0.06em; }
+
+/* Target selector = one joined segmented slider.
+   FILL  = occupancy: white when any light in that scope is on, gray when all off.
+   THUMB = a blue ring that slides to the currently-selected segment.
+   The two are independent: a segment can be "on" (white) without being selected,
+   and selected without being on. */
+.light-targets {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--seg-count, 3), minmax(0, 1fr));
+  gap: 0;
+  margin: 0.75rem 0 0.6rem;
+  border: 1.5px solid #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.34);
+  isolation: isolate;
+}
+.light-target-btn,
+.light-target-btn:hover,
+.light-target-btn:active {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 62px;
+  padding: 0.4rem 0.35rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  border: 0;
+  border-radius: 0;
+  background: #383838;              /* gray = nothing on in this scope */
+  color: #c9c9c7;
+  box-shadow: none;
+  transform: none;
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  line-height: 1.08;
+  text-align: center;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+/* hairline divider between joined segments */
+.light-target-btn:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 15%; bottom: 15%;
+  width: 1.5px;
+  background: rgba(255, 255, 255, 0.26);
+}
+/* line 1: icon + name */
+.light-target-btn .target-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+}
+.light-target-btn .icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.light-target-btn .btn-label {
+  min-width: 0;
+  white-space: normal;
+}
+/* line 2: this scope's live state — {COLOR} {pct}% or OFF */
+.light-target-btn .target-sub {
+  font-family: "Space Mono", monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.82;
+  min-height: 0.8em;
+}
+/* OCCUPANCY: at least one light on in this target -> white fill, dark text */
+.light-target-btn.is-on {
+  background: #f5f5f4;
+  color: #141410;
+}
+/* SELECTION: the sliding thumb ring glides across the track */
+.target-thumb {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: calc(100% / var(--seg-count, 3));
+  transform: translateX(calc(var(--sel, 0) * 100%));
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+  box-shadow: inset 0 0 0 3px #1e88e5;
+  border-radius: 11px;
+  pointer-events: none;
+  z-index: 2;
+}
 
 /* album-art area: round the corners, thin the frame — color stays --art-accent */
 .np-art,
@@ -430,8 +565,8 @@ body { overscroll-behavior: contain; }
    on a portrait iPhone without overflowing */
 .kitchen-title {
   letter-spacing: 0.01em;
-  justify-content: flex-start;     /* left-aligned so it doesn't shift as the width changes */
-  text-align: left;
+  justify-content: center;         /* centered header */
+  text-align: center;
   font-size: clamp(1.4rem, 6.5vw, 2.6rem);
   min-width: 0;
   white-space: nowrap;
@@ -439,16 +574,18 @@ body { overscroll-behavior: contain; }
   -webkit-text-stroke: 2px #ffffff;
   paint-order: stroke fill;
 }
-.kitchen-head { text-align: left; }
+.kitchen-head { text-align: center; }
 /* the deck word ("Lights"/"Music") is a separate flex item — restore the space */
 /* room name is the big word; mode + % ride smaller alongside it (mobile hierarchy) */
 .kitchen-title #hero-deck,
+.kitchen-title #hero-color,
 .kitchen-title #hero-status {
   font-size: 0.5em;
   -webkit-text-stroke-width: 1px;
   align-self: center;
 }
 .kitchen-title #hero-deck { margin-left: 0.45em; }
+.kitchen-title #hero-color:not(:empty) { margin-left: 0.4em; }
 .kitchen-title #hero-status:not(:empty) { margin-left: 0.4em; }
 
 /* the OFF buttons (Bed / BOH / House) sit side by side, equal width —
@@ -474,7 +611,7 @@ body { overscroll-behavior: contain; }
 .room-decks {
   display: block;
   margin-bottom: 1.5rem;
-  overflow: hidden;                /* clip the slide-in so nothing spills sideways */
+  overflow: visible;               /* let OFF-button shadows render like footer nav */
 }
 .room-decks .deck {
   margin-bottom: 0;               /* .section's own margin lives on .room-decks now */

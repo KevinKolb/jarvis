@@ -83,20 +83,19 @@ const CONFIG = {
 const RADIO_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.5M19.1 4.9a10 10 0 0 1 0 14.2M16.2 7.8a6 6 0 0 1 0 8.5"/><circle cx="12" cy="12" r="2"/></svg>';
 const PODCAST_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a5 5 0 0 0-5 5v4a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5Z"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4M8 22h8"/></svg>';
 const CHEV_ICON = '<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
+const HOUSE_ICON = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg>';
+const LIVING_ICON = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 11a2 2 0 0 1 2 2v3h16v-3a2 2 0 0 1 2-2 2 2 0 0 0-2 2v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a2 2 0 0 0-2-2Z"/><path d="M4 18v2"/><path d="M20 18v2"/></svg>';
+const ROOM_OFF_ICONS = { living: LIVING_ICON };
 
-/* ---------- Toast (butler voice) ---------- */
-let toastTimer = null;
-function toast(message) {
-  const el = document.getElementById("toast");
-  if (!el) return;
-  el.innerHTML =
-    '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>' +
-    '<span></span>';
-  el.querySelector("span").textContent = message;
-  el.classList.add("show");
-  window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => el.classList.remove("show"), 2600);
+function setIconButtonLabel(btn, icon, label) {
+  btn.innerHTML = (icon || "") + '<span class="btn-label"></span>';
+  btn.querySelector(".btn-label").textContent = label;
 }
+
+/* ---------- Toast ---------- */
+// Notifications are disabled — feedback lives in the header (Jarvis line) and the
+// controls themselves. Kept as a no-op so existing callers stay harmless.
+function toast(message) { /* notifications removed */ }
 
 /* ---------- Run an iOS Shortcut (opens Shortcuts app) ---------- */
 function runShortcut(name) {
@@ -120,7 +119,12 @@ function runFetch(req) {
 
 /* ---------- Ask the Pi relay to talk to the Hue bridge ---------- */
 function runHueProxy(hue) {
-  HUE_WRITE.forEach((bridge) => {       // "all" = send to both hubs
+  HUE_WRITE.forEach((bridge) => runHueProxyToBridge(bridge, hue));       // "all" = send to both hubs
+}
+
+function runHueProxyToBridge(bridge, hue) {
+  const bridges = bridge === "all" ? HUE_ALL_BRIDGES : [bridge || "main"];
+  bridges.forEach((bridge) => {
     fetch(piUrl("/hue"), {              // Pi, not the bridge
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -155,14 +159,19 @@ let npCategory = "";                                      // music row now playi
 const withRoom = (o) => JSON.stringify(Object.assign({ page: ROOM, category: npCategory }, o));  // POST body
 
 /* ---------- Read + show current light status ---------- */
+function idList(value) {
+  return String(value || "").split(",").map((id) => id.trim()).filter(Boolean);
+}
+
 const LIGHTS_GROUP = CFG.lightsGroup || "82";            // Hue group id
-const LIGHTS_MEMBERS = (CFG.lightsMembers || "22,21,20,63,62").split(",").filter(Boolean);  // bulbs (true color)
+const LIGHTS_MEMBERS = idList(CFG.lightsMembers || "22,21,20,63,62");  // bulbs in this room
 let lightsOn = null;         // true / false / null (unknown)
 let lightsBri = null;        // current on-brightness as 0-100 %, or null
 let lightsColor = null;      // current light color mapped to a swatch name, or null
 let lightHeroBg = "#8a8a8a"; // current light color css (for the header on the Lights deck)
+let lightHeroFg = "#141410"; // matching ink for that tint
 let pendingColor = null;     // { body, css } current color selection (default white)
-let pendingBri = 254;        // current brightness selection (default 100%)
+let pendingBri = null;       // current brightness selection (null = none chosen yet)
 let pendingBriVis = 1;       // display-only shade for that selection (0-1)
 let selectedSwatchEl = null; // currently highlighted swatch
 let selectedBriEl = null;    // currently highlighted brightness box
@@ -187,15 +196,104 @@ function runHueLights(ids, body) {
 // when a colored (hue) scene is engaged: then the office lamp is turned OFF
 // (it can't show the color) and only the color-capable members get the scene.
 const OFFICE_LAMP = CFG.officeLamp || "";
-function applyLights(body) {
+const COLOR_OFF_MEMBERS = idList(CFG.colorOffMembers || OFFICE_LAMP);
+const WHITE_ONLY_MEMBERS = idList(CFG.whiteOnlyMembers || "");
+let selectedLightTargetKey = "room";
+let lastControlsKey = null;   // last live state the pick columns were synced to
+let lightTargetStatusByKey = {};
+let lightTargetStatusReadSeq = {};
+
+function lightTarget(label, icon, parts) {
+  return { label: label, icon: icon, parts: parts };
+}
+
+const FOH_LIGHT_MEMBERS = idList(CFG.fohLightsMembers || "");
+const BOH_LIGHT_MEMBERS = idList(CFG.bohLightsMembers || "");
+// TV lights: never controlled by this room — excluded from EVERY command (even white).
+const TV_MEMBERS = idList(CFG.tvMembers || "");
+const FOH_TV_MEMBERS = idList(CFG.fohTvMembers || CFG.tvMembers || "");
+const BOH_TV_MEMBERS = idList(CFG.bohTvMembers || "");
+const LIGHT_TARGETS = {
+  room: lightTarget(ROOM_LABEL + " Lights", ROOM_OFF_ICONS[ROOM], [{
+    bridge: HUE_BRIDGE,
+    group: LIGHTS_GROUP,
+    members: LIGHTS_MEMBERS,
+    colorOff: COLOR_OFF_MEMBERS,
+    whiteOnly: WHITE_ONLY_MEMBERS,
+    exclude: TV_MEMBERS,
+  }]),
+  foh: lightTarget("Front of House Lights", HOUSE_ICON, [{
+    bridge: "main",
+    group: "0",
+    members: FOH_LIGHT_MEMBERS,
+    colorOff: idList(CFG.fohColorOffMembers || ""),
+    whiteOnly: idList(CFG.fohWhiteOnlyMembers || CFG.whiteOnlyMembers || ""),
+    exclude: FOH_TV_MEMBERS,
+  }]),
+  boh: lightTarget("Back of House Lights", HOUSE_ICON, [{
+    bridge: "bedroom",
+    group: "0",
+    members: BOH_LIGHT_MEMBERS,
+    colorOff: idList(CFG.bohColorOffMembers || ""),
+    whiteOnly: idList(CFG.bohWhiteOnlyMembers || ""),
+    exclude: BOH_TV_MEMBERS,
+  }]),
+  house: lightTarget("Whole House Lights", HOUSE_ICON, [{
+    bridge: "main",
+    group: "0",
+    members: FOH_LIGHT_MEMBERS,
+    colorOff: idList(CFG.fohColorOffMembers || ""),
+    whiteOnly: idList(CFG.fohWhiteOnlyMembers || CFG.whiteOnlyMembers || ""),
+    exclude: FOH_TV_MEMBERS,
+  }, {
+    bridge: "bedroom",
+    group: "0",
+    members: BOH_LIGHT_MEMBERS,
+    colorOff: idList(CFG.bohColorOffMembers || ""),
+    whiteOnly: idList(CFG.bohWhiteOnlyMembers || ""),
+    exclude: BOH_TV_MEMBERS,
+  }]),
+};
+
+function currentLightTarget() {
+  return LIGHT_TARGETS[selectedLightTargetKey] || LIGHT_TARGETS.room;
+}
+
+function primaryLightStatusTargetKey() {
+  return LIGHT_TARGETS[CFG.defaultLightTarget] ? CFG.defaultLightTarget : "room";
+}
+
+function engageTargetLabel(label) {
+  return String(label || "").replace(/\s+Lights$/i, "\nLights");
+}
+
+function runHueLightsOnBridge(bridge, ids, body) {
+  ids.forEach((id) => runHueProxyToBridge(bridge, { path: "/lights/" + id + "/state", body: body }));
+}
+
+function applyLightTargetPart(part, body) {
   const colored = body && Object.prototype.hasOwnProperty.call(body, "hue");
-  if (OFFICE_LAMP && colored) {
-    runHueLights([OFFICE_LAMP], { on: false });   // colored scene starts by turning it off
-    const colorMembers = LIGHTS_MEMBERS.filter((id) => id !== OFFICE_LAMP);
-    if (colorMembers.length) runHueLights(colorMembers, body);
+  const exclude = part.exclude || [];                       // TV lights: NEVER touched (even white)
+  const colorOff = colored ? (part.colorOff || []) : [];
+  const whiteOnly = colored ? (part.whiteOnly || []) : [];
+  const members = (part.members || []);
+  // If anything must be held back, address bulbs individually; otherwise the group
+  // command is fine (it hits every group member, so it's only safe with no excludes).
+  if (members.length && (exclude.length || colorOff.length || whiteOnly.length)) {
+    if (colorOff.length) {
+      const offIds = colorOff.filter((id) => exclude.indexOf(id) === -1);
+      if (offIds.length) runHueLightsOnBridge(part.bridge, offIds, { on: false });
+    }
+    const skip = exclude.concat(colorOff).concat(whiteOnly);
+    const targetMembers = members.filter((id) => skip.indexOf(id) === -1);
+    if (targetMembers.length) runHueLightsOnBridge(part.bridge, targetMembers, body);
   } else {
-    runHue(body);   // white / brightness-only / off -> whole group (incl. office lamp)
+    runHueProxyToBridge(part.bridge, { path: "/groups/" + part.group + "/action", body: body });
   }
+}
+
+function applyLights(body) {
+  currentLightTarget().parts.forEach((part) => applyLightTargetPart(part, body));
 }
 
 // White + ROYGBV. `css` is the swatch color; `body` is sent to the bridge.
@@ -224,8 +322,8 @@ const MUSIC = {
     { label: "Beatles", fav: "CH 18 - The Beatles Channel" },
   ],
   artists: [
-    { label: "Warren Zevon", fav: "Warren Zevon" },
-    { label: "Hootie and the Blowfish", fav: "Hootie and the Blowfish" },
+    { label: "Hootie & The Blowfish", shuffle: true, apple: { kind: "playlist", id: "pl.8ed10a4ddd0248d68906350838bcf12a", title: "Hootie & The Blowfish" } },
+    { label: "Warren Zevon", shuffle: true, apple: { kind: "playlist", id: "pl.fb29bc376e6d486c81b291dc66515121", title: "Warren Zevon Essentials" } },
   ],
   jukebox: [
     { label: "Junebug!", apple: { kind: "song", id: "6783079574", title: "Junebug" } },
@@ -249,7 +347,7 @@ const MUSIC = {
   ],
 };
 
-let sonosVol = 0, sonosMuted = false, npTrack = "", npStation = "", npPlaylist = "", npPlaying = false;
+let sonosVol = 0, sonosMuted = false, npTrack = "", npStation = "", npPlaylist = "", npPlaying = false, npTv = false;
 let volHoldUntil = 0;   // your manual volume wins over polling until this time
 
 function renderVol() {
@@ -287,8 +385,9 @@ function renderNP() {
   const c = document.getElementById("np-cat");
   if (c) {
     const playing = npPlaying || npPlaylist || npTrack || npStation;
-    c.textContent = (playing && npCategory) ? "FROM " + npCategory.toUpperCase() : "";
+    c.textContent = (!npTv && playing && npCategory) ? "FROM " + npCategory.toUpperCase() : "";
   }
+  if (typeof sayJarvis === "function") sayJarvis();   // keep the music line current
 }
 function setSonosVolume(level) {
   fetch(piUrl("/sonos/volume"), { method: "POST", headers: { "Content-Type": "application/json" },
@@ -340,12 +439,14 @@ function updateSonos() {
       if (typeof d.volume === "number" && Date.now() > volHoldUntil) sonosVol = d.volume;
       sonosMuted = !!d.mute;
       npPlaying = !!d.playing;
+      npTv = !!d.tv;
       npTrack = d.track || "";
       npStation = d.station || "";
       npPlaylist = d.playlist || "";
       const tvBtn = document.getElementById("tv-mode");   // bedroom only
-      if (tvBtn) tvBtn.classList.toggle("on", !!d.tv);
-      if (!npCategory && d.category) npCategory = d.category;   // restore on fresh load
+      if (tvBtn) tvBtn.classList.toggle("on", npTv);
+      if (npTv) npCategory = "";
+      else if (!npCategory && d.category) npCategory = d.category;   // restore on fresh load
       updatePlayPause();
       updateSkip();
       const playbar = document.querySelector(".np-playbar");    // no transport controls in TV mode
@@ -355,8 +456,33 @@ function updateSonos() {
       const msg = document.getElementById("np-art-msg");
       const tvArt = document.getElementById("np-art-tv");   // bedroom TV graphic
       const sourceName = () => npPlaylist || npStation || npTrack || "No art";
-      if (tvArt) tvArt.hidden = !d.tv;
-      if (d.tv) {                              // TV audio: show the TV graphic, nothing else
+      const artSrc = (url) => /^[a-z][a-z0-9+.-]*:/i.test(url || "") ? url : piUrl(url || "");
+      const probeSrc = (url) => /^[a-z][a-z0-9+.-]*:/i.test(url || "")
+        ? piUrl("/art?u=" + encodeURIComponent(url))
+        : piUrl(url || "");
+      const showArtwork = (url) => {
+        if (!art || !loading || !url) return false;
+        if (url !== lastArtUrl) {
+          lastArtUrl = url;
+          setArtAccent(null);
+          if (msg) msg.textContent = "Loading art...";
+          loading.hidden = false;
+          art.hidden = true;
+          art.onload = () => { art.hidden = false; loading.hidden = true; };
+          art.onerror = () => { if (msg) msg.textContent = sourceName(); };
+          art.src = artSrc(url);
+          const probe = new Image();
+          probe.crossOrigin = "anonymous";
+          probe.onload = () => setArtAccent(extractArtColor(probe));
+          probe.onerror = () => setArtAccent(null);
+          probe.src = probeSrc(url);
+        }
+        return true;
+      };
+      if (tvArt) tvArt.hidden = !(d.tv && !d.art);
+      if (d.tv && d.art && showArtwork(d.art)) {
+        if (tvArt) tvArt.hidden = true;
+      } else if (d.tv) {                       // TV audio without artwork: show the TV graphic
         lastArtUrl = "";
         if (art) { art.hidden = true; art.removeAttribute("src"); }
         if (loading) loading.hidden = true;
@@ -482,10 +608,13 @@ function renderShare() {
       }
       // FOH/BOH macros — coordinator room implicit. 3rd item = friendly toast name.
       const MACROS = {
-        house: [["FOH", ["Kitchen", "Living Room"]], ["BOH", ["Bedroom", "Office", "Bathroom"]], ["ENTRYWAY", ["Entryway"]]],
-        kitchen: [["FOH", ["Lounge", "Living Room"]], ["BOH", ["Bedroom", "Office", "Bathroom"]]],
-        bedroom: [["ADD BATH", ["Bathroom"], "Bath"]],
-        bathroom: [["BOH", ["Bedroom"]]],
+        house: [
+          ["FOH", ["Kitchen", "Living Room"]],
+          ["ENTRYWAY", ["Entryway"]],
+          ["BATH", ["Bathroom"], "Bath"],
+          ["BED", ["Bedroom"], "Bed"],
+        ],
+        kitchen: [["FOH", ["Lounge", "Living Room"]]],
       };
       // Pages that show only All + macros (no individual room buttons)
       const MACROS_ONLY = { house: true, bathroom: true, bedroom: true };
@@ -507,6 +636,8 @@ function renderShare() {
         host.appendChild(b);
       });
       syncGroups();
+      const row = host.closest(".tool-row");
+      if (row) row.hidden = host.children.length === 0;
     })
     .catch(() => {});
 }
@@ -836,42 +967,57 @@ function briDisplayOpacity(pct) {
 // Header color follows the active deck: the live light hue on Lights, the
 // album-art color on Music.
 function updateHeaderColor() {
+  applyPageBg();   // deck switch: repaint the body (black on Music, tint on Lights)
   const el = document.querySelector('.kitchen-head .kitchen-title');
   if (!el) return;
   const music = document.getElementById("deck-music");
-  if (music && music.classList.contains("deck-active")) {
+  if (music && music.classList.contains("deck-active") && CFG.heroPlain !== "true") {
     const accent = (getComputedStyle(document.documentElement).getPropertyValue("--art-accent") || "#9a9a9a").trim();
     el.style.color = accent;
     el.style.opacity = 1;
     el.style.setProperty("-webkit-text-stroke-color", "#ffffff");
   } else {
-    el.style.color = lightsOn === true ? lightHeroBg : "#8a8a8a";
-    el.style.opacity = lightsOn === true ? briDisplayOpacity(lightsBri) : 1;
-    const whiteLight = lightsOn === true && lightHeroBg && lightHeroBg.toLowerCase() === "#ffffff";
-    el.style.setProperty("-webkit-text-stroke-color", whiteLight ? "#000000" : "#ffffff");
+    el.style.color = "#ffffff";                                   // white fill
+    el.style.opacity = 1;
+    el.style.setProperty("-webkit-text-stroke-color", "#000000"); // black outline
   }
+}
+// Paint the page body: the light tint on the Lights deck, always black on Music.
+function applyPageBg() {
+  const hero = document.getElementById(ROOM + "-hero");
+  if (!hero) return;
+  const music = document.getElementById("deck-music");
+  const onMusic = !!(music && music.classList.contains("deck-active"));
+  const bg = onMusic ? "#000000" : lightHeroBg;
+  const fg = onMusic ? "#f5f5f4" : lightHeroFg;
+  document.body.classList.add("tinted");
+  document.body.style.background = bg;
+  hero.style.color = fg;
+  document.documentElement.style.setProperty("--page-ink", fg);
 }
 // Hero reflects the ACTUAL current light (on/off + color), not the staged pick.
 function paintHero(on, state) {
   let bg, fg;
   if (on && state) {
     const sw = nearestSwatch(state);
-    bg = sw.css;
-    fg = textColorFor(sw.css);
+    // Dim the page tint by brightness so it carries the same shade the matching
+    // box shows in "Choose Brightness" (full color at 100%, darker as it dims).
+    const pct = typeof state.bri === "number" ? Math.round((state.bri / 254) * 100) : null;
+    const vf = briVisForPct(pct);
+    const rgb = hexToRgb(sw.css);
+    const dr = Math.round(rgb[0] * vf), dg = Math.round(rgb[1] * vf), db = Math.round(rgb[2] * vf);
+    bg = "rgb(" + dr + "," + dg + "," + db + ")";
+    const lum = (0.299 * dr + 0.587 * dg + 0.114 * db) / 255;
+    fg = lum > 0.6 ? "#141410" : "#ffffff";
   } else {
     bg = "#000000";      // lights off -> black
     fg = "#b8b8b8";      // light gray text
   }
-  const hero = document.getElementById(ROOM + "-hero");   // room page: tint the whole page
-  if (hero) {
-    document.body.classList.add("tinted");
-    document.body.style.background = bg;
-    hero.style.color = fg;
-    document.documentElement.style.setProperty("--page-ink", fg);   // footer status matches the title
-  }
+  lightHeroBg = bg;                 // remember the light tint (+ ink) for the header
+  lightHeroFg = fg;
+  applyPageBg();                    // paint the body: light tint on Lights, black on Music
   const card = document.getElementById("room-" + ROOM);   // home page: tint the room tile
   if (card) { card.style.background = bg; card.style.color = fg; }
-  lightHeroBg = bg;                 // remember the light color for the header
   updateHeaderColor();              // header follows deck: light color (Lights) / art color (Music)
   // Lights deck tab reflects the actual light color (black when off)
   const ltab = document.querySelector('.deck-tab[data-deck="deck-lights"]');
@@ -931,6 +1077,189 @@ function summarizeHueStatus(results) {
   };
 }
 
+function lightHasHue(body) {
+  return !!(body && Object.prototype.hasOwnProperty.call(body, "hue"));
+}
+
+function lightState(entry) {
+  return entry && entry.light && entry.light.state ? entry.light.state : null;
+}
+
+function lightIsUsable(entry) {
+  const state = lightState(entry);
+  return !!(state && state.reachable !== false);
+}
+
+function lightPct(state) {
+  return state && typeof state.bri === "number" ? Math.round((state.bri / 254) * 100) : null;
+}
+
+function lightPctMatches(state, pct) {
+  const actual = lightPct(state);
+  return actual != null && Math.abs(actual - pct) <= 6;
+}
+
+function lightColorMatches(state, color) {
+  return !!(state && color && nearestSwatch(state).name === color.name);
+}
+
+function lightEntryMap(entries) {
+  const map = {};
+  (entries || []).forEach((entry) => { if (entry && entry.id) map[entry.id] = entry; });
+  return map;
+}
+
+function readLightTargetPartStatus(part) {
+  const memberIds = (part.members || []).filter(Boolean);
+  const groupReq = hueGet(part.bridge, "/groups/" + part.group).catch(() => null);
+  const lightsReq = memberIds.length
+    ? Promise.all(memberIds.map((id) =>
+        hueGet(part.bridge, "/lights/" + id)
+          .then((light) => ({ id: id, light: light }))
+          .catch(() => ({ id: id, light: null }))
+      ))
+    : hueGet(part.bridge, "/lights")
+        .then((data) => Object.keys(data || {}).map((id) => ({ id: id, light: data[id] })))
+        .catch(() => []);
+
+  return Promise.all([groupReq, lightsReq]).then(([grp, lights]) => {
+    const readLights = (lights || []).filter((entry) => !!(entry && entry.light));
+    return { part: part, grp: grp, lights: lights || [], ok: !!grp || readLights.length > 0 };
+  });
+}
+
+function summarizeLightTargetStatus(partStatuses) {
+  const online = partStatuses.filter((partStatus) => partStatus.ok);
+  const groups = online.map((partStatus) => partStatus.grp).filter(Boolean);
+  const allEntries = online.reduce((acc, partStatus) => {
+    return acc.concat((partStatus.lights || []).filter((entry) => !!lightState(entry)));
+  }, []);
+  const usableEntries = allEntries.filter(lightIsUsable);
+  const entries = usableEntries.length ? usableEntries : allEntries;
+  const onEntries = entries.filter((entry) => {
+    const state = lightState(entry);
+    return !!(state && state.on);
+  });
+  const rep = onEntries.find((entry) => {
+    const state = lightState(entry);
+    return state && state.colormode !== "ct" && (state.sat || 0) >= 20;
+  }) || onEntries[0] || entries[0];
+  const state = rep ? lightState(rep) : {};
+  const action = groups.map((grp) => grp && grp.action).find((a) => a && typeof a.bri === "number");
+  const bri = typeof state.bri === "number" ? state.bri : (action ? action.bri : null);
+  const groupOn = groups.some((grp) => !!(grp && grp.state && grp.state.any_on));
+  return {
+    online: online.length > 0,
+    complete: online.length === partStatuses.length,
+    on: entries.length ? onEntries.length > 0 : groupOn,
+    state: state,
+    bri: bri,
+    parts: partStatuses,
+  };
+}
+
+function readLightTargetStatus(key) {
+  const target = LIGHT_TARGETS[key] || LIGHT_TARGETS.room;
+  return Promise.all(target.parts.map(readLightTargetPartStatus))
+    .then(summarizeLightTargetStatus);
+}
+
+function refreshLightTargetStatus(key) {
+  const targetKey = LIGHT_TARGETS[key] ? key : "room";
+  const seq = (lightTargetStatusReadSeq[targetKey] || 0) + 1;
+  lightTargetStatusReadSeq[targetKey] = seq;
+  return readLightTargetStatus(targetKey)
+    .then((status) => {
+      if (lightTargetStatusReadSeq[targetKey] !== seq) return status;
+      lightTargetStatusByKey[targetKey] = status;
+      if (selectedLightTargetKey === targetKey) updateToggle();
+      return status;
+    })
+    .catch(() => {
+      if (lightTargetStatusReadSeq[targetKey] !== seq) return null;
+      delete lightTargetStatusByKey[targetKey];
+      if (selectedLightTargetKey === targetKey) updateToggle();
+      return null;
+    });
+}
+
+function targetStatusIsOff(status) {
+  if (!status || !status.online) return false;
+  let checked = 0;
+  for (const partStatus of status.parts || []) {
+    const part = partStatus.part || {};
+    const ids = (part.members || []).filter(Boolean);
+    const byId = lightEntryMap(partStatus.lights);
+    const entries = ids.length ? ids.map((id) => byId[id]).filter(Boolean) : (partStatus.lights || []);
+    for (const entry of entries) {
+      if (!lightIsUsable(entry)) continue;
+      checked += 1;
+      const state = lightState(entry);
+      if (state && state.on) return false;
+    }
+  }
+  if (checked > 0) return true;
+  return (status.parts || []).every((partStatus) => {
+    const grp = partStatus.grp;
+    return !!(grp && grp.state && grp.state.any_on === false);
+  });
+}
+
+function targetStatusMatchesSelection(status, isOff, pct, color) {
+  if (!status || !status.online) return false;
+  if (isOff) return targetStatusIsOff(status);
+
+  const colored = lightHasHue(color && color.body);
+  let checked = 0;
+  for (const partStatus of status.parts || []) {
+    const part = partStatus.part || {};
+    const ids = (part.members || []).filter(Boolean);
+    const byId = lightEntryMap(partStatus.lights);
+    const colorOff = colored ? (part.colorOff || []) : [];
+    const whiteOnly = colored ? (part.whiteOnly || []) : [];
+
+    for (const id of ids) {
+      const shouldBeOff = colorOff.indexOf(id) !== -1;
+      if (!shouldBeOff && whiteOnly.indexOf(id) !== -1) continue;
+      const entry = byId[id];
+      if (!lightIsUsable(entry)) return false;
+      const state = lightState(entry);
+      if (shouldBeOff) {
+        checked += 1;
+        if (state.on) return false;
+        continue;
+      }
+      if (whiteOnly.indexOf(id) !== -1) continue;
+      checked += 1;
+      if (!state.on || !lightPctMatches(state, pct) || !lightColorMatches(state, color)) return false;
+    }
+  }
+  return checked > 0;
+}
+
+function optimisticLightTargetStatus(target, body) {
+  const colored = lightHasHue(body);
+  const partStatuses = target.parts.map((part) => {
+    const colorOff = colored ? (part.colorOff || []) : [];
+    const whiteOnly = colored ? (part.whiteOnly || []) : [];
+    const lights = (part.members || []).map((id) => {
+      if (colored && whiteOnly.indexOf(id) !== -1 && colorOff.indexOf(id) === -1) {
+        return { id: id, light: null };
+      }
+      const state = Object.assign({ reachable: true }, body);
+      if (colored && colorOff.indexOf(id) !== -1) state.on = false;
+      return { id: id, light: { state: state } };
+    });
+    return {
+      part: part,
+      grp: { state: { any_on: body.on !== false }, action: body },
+      lights: lights,
+      ok: true,
+    };
+  });
+  return summarizeLightTargetStatus(partStatuses);
+}
+
 // Home page: tint each room tile with its OWN room's live light color.
 // Config (bridge / group / member bulbs) rides on each tile's data-* attrs.
 function tintRoomCard(card) {
@@ -973,10 +1302,11 @@ function tintHomeCards() {   // home tiles + room-nav pills: each tinted by its 
 }
 
 function updateLightsStatus() {
-  readHueStatus(HUE_READ, LIGHTS_GROUP, LIGHTS_MEMBERS)
-    .then((results) => {
-      const status = summarizeHueStatus(results);
+  const primaryKey = primaryLightStatusTargetKey();
+  readLightTargetStatus(primaryKey)
+    .then((status) => {
       if (!status.online) throw new Error("Hue offline");
+      lightTargetStatusByKey[primaryKey] = status;
       setConn(status.complete);
       lightsOn = status.on;
       const bpct = typeof status.bri === "number" ? Math.round((status.bri / 254) * 100) : null;
@@ -993,12 +1323,23 @@ function updateLightsStatus() {
       paintHero(status.on, status.state);
       updateToggle();
       refreshOffButtons();
+      refreshTargetOccupancy();      // repaint the segment fills from live state
+      sayJarvis();                   // keep the Jarvis line on the current state
+      // Reflect the current state in the color/brightness columns — but only when
+      // the selected target IS the one we just read, and only when the state has
+      // actually changed (so an in-progress pick isn't wiped by a poll).
+      if (selectedLightTargetKey === primaryKey) {
+        const ck = [lightsOn, lightsColor, lightsBri].join("|");
+        if (ck !== lastControlsKey) { lastControlsKey = ck; syncControlsToTarget(status); }
+      }
+      if (selectedLightTargetKey !== primaryKey) refreshLightTargetStatus(selectedLightTargetKey);
     })
     .catch(() => {
       setConn(false);
       lightsOn = null;
       lightsBri = null;
       lightsColor = null;
+      delete lightTargetStatusByKey[primaryKey];
       const text = document.getElementById("lights-line-text");
       if (text) {
         text.textContent = "Lights —";
@@ -1021,16 +1362,18 @@ function textColorFor(css) {
   return lum > 0.6 ? "#141410" : "#ffffff";
 }
 
-// When the lights go off, reset the controls to defaults: white + 100%.
+// Reset the controls to a blank slate: NO color and NO brightness pre-selected.
+// The columns instead reflect the live state (see syncControlsToTarget); when the
+// lights are off, nothing is selected.
 function resetLightControls() {
   const white = COLORS.find((c) => c.name === "White");
-  pendingColor = { body: white.body, css: white.css, name: white.name };
-  pendingBri = 254;                                 // 100%
+  pendingColor = null;                              // no color chosen
+  pendingBri = null;                                // no brightness chosen
   pendingBriVis = 1;
   dirty = false;
-  selectSwatch(document.querySelector('#swatches .swatch[data-name="White"]'));
-  selectBri(document.querySelector('#bri-boxes .bri-box[data-pct="100"]'));
-  setTrackColor(white.css);
+  selectSwatch(null);
+  selectBri(null);
+  setTrackColor(white.css);                         // neutral track tint for the bri boxes
   paintBriBoxes(white.css);
   updateToggle();
 }
@@ -1039,47 +1382,302 @@ function resetLightControls() {
 function updateToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
-  const pct = pendingBri != null ? Math.round((pendingBri / 254) * 100) : 100;
-  const name = pendingColor ? pendingColor.name : "";
+  const hasBri = pendingBri != null;
+  const pct = hasBri ? Math.round((pendingBri / 254) * 100) : 100;
   const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
+  const targetStatus = lightTargetStatusByKey[selectedLightTargetKey];
+  const engaged = targetStatusMatchesSelection(targetStatus, isOff, pct, pendingColor);
+  const ctaEl = btn.querySelector(".engage-cta");
+  if (ctaEl) ctaEl.textContent = engaged ? "Current" : "Tap to Set";
   const pctEl = document.getElementById("engage-pct");
-  if (pctEl) pctEl.textContent = isOff ? "Off" : pct + "%";
+  if (pctEl) pctEl.textContent = (isOff || !hasBri) ? "" : pct + "%";
+  const target = currentLightTarget();
+  const targetEl = document.getElementById("engage-target");
+  if (targetEl) targetEl.textContent = engageTargetLabel(target.label);
+  btn.setAttribute("aria-label", "Toggle " + target.label);
   const nameEl = document.getElementById("engage-color");
   if (nameEl) {
-    nameEl.textContent = pendingColor ? pendingColor.name : "";
-    if (pendingColor) {
-      nameEl.style.color = pendingColor.css;   // the word IS the color
-      // white outline, but black for the white word so it stays visible
-      nameEl.style.setProperty("-webkit-text-stroke-color", pendingColor.name === "White" ? "#000000" : "#ffffff");
-    }
+    nameEl.textContent = isOff ? "OFF" : (pendingColor ? pendingColor.name : "");
+    nameEl.style.color = "";
+    nameEl.style.removeProperty("-webkit-text-stroke-color");
   }
   const paddle = btn.querySelector(".engage-paddle");   // the switch paddle carries the color
   btn.style.color = "";
-  btn.dataset.state = lightsOn === true ? "on" : lightsOn === false ? "off" : "unknown";
+  btn.dataset.state = targetStatus && targetStatus.on === true ? "on"
+    : targetStatus && targetStatus.on === false ? "off"
+    : "unknown";
+  btn.classList.toggle("is-off-choice", isOff);
+  btn.classList.toggle("is-current", engaged);
   if (isOff) {                                // black or 0% -> off preview
     if (paddle) paddle.style.background = "#000000";
-    btn.style.color = "#b8b8b8";              // light gray, like the off hero
+    btn.style.color = "#f5f5f4";
   } else if (pendingColor) {                  // paddle = the color at the chosen brightness's display shade
     const frac = pendingBriVis;
     const rgb = hexToRgb(pendingColor.css);
     const r = Math.round(rgb[0] * frac), g = Math.round(rgb[1] * frac), b = Math.round(rgb[2] * frac);
     if (paddle) paddle.style.background = "rgb(" + r + "," + g + "," + b + ")";
-    // text: always white, except black when White is the chosen color
-    btn.style.color = pendingColor.name === "White" ? "#000000" : "#ffffff";
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    btn.style.color = lum > 0.6 ? "#141410" : "#ffffff";
   }
-  // Wall switch reads "on" only when the room actually matches the staged
-  // color + brightness (so the default White/100% shows on only if the room
-  // is really white at 100%).
-  const pctMatch = lightsBri != null && Math.abs(lightsBri - pct) <= 6;
-  const colorMatch = pendingColor && lightsColor && pendingColor.name === lightsColor;
-  const engaged = lightsOn === true && colorMatch && pctMatch;
   btn.classList.toggle("engaged", engaged);
-  // engaged (the "swipe down for off" state) uses our standard gray + light text
-  if (engaged && paddle) {
-    paddle.style.background = "var(--surface)";
-    btn.style.color = "#f5f5f4";
-  }
   updateLightsTab();
+}
+
+function selectLightTarget(key) {
+  if (!LIGHT_TARGETS[key]) key = "room";
+  selectedLightTargetKey = key;
+  const host = document.getElementById("light-targets");
+  const btns = host ? Array.from(host.querySelectorAll("[data-light-target]")) : [];
+  let idx = 0;
+  btns.forEach((btn, i) => {
+    const selected = btn.dataset.lightTarget === key;
+    if (selected) idx = i;
+    btn.classList.toggle("is-selected", selected);   // a11y hook; the thumb shows selection
+    btn.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+  if (host) host.style.setProperty("--sel", String(idx));   // slide the thumb to it
+  updateToggle();
+  // Reflect the chosen target's current color + brightness in the pick columns.
+  if (lightTargetStatusByKey[key]) syncControlsToTarget(lightTargetStatusByKey[key]);  // cached, instant
+  refreshLightTargetStatus(key).then((status) => {          // then reconcile from bridge
+    if (selectedLightTargetKey === key && status) syncControlsToTarget(status);
+  });
+  refreshTargetOccupancy();
+}
+
+// Point the color + brightness columns at a target's CURRENT state: a uniform
+// scene selects the matching swatch + brightness box (so the next tweak starts
+// from there); "various"/"off"/unknown just clears the brightness selection.
+function syncControlsToTarget(status) {
+  const u = targetUniformState(status);
+  if (u.state === "uniform") {
+    const c = COLORS.find((x) => x.name === u.color);
+    if (c) {
+      const sw = document.querySelector('#swatches .swatch[data-name="' + c.name + '"]');
+      if (sw) selectSwatch(sw);
+      setTrackColor(c.css);
+      paintBriBoxes(c.css);
+      pendingColor = { body: c.body, css: c.css, name: c.name, off: c.off };
+    }
+    if (u.pct != null) {
+      let best = null, bestD = Infinity;
+      document.querySelectorAll("#bri-boxes .bri-box").forEach((b) => {
+        const p = Number(b.dataset.pct);
+        if (p === 0) return;
+        const d = Math.abs(p - u.pct);
+        if (d < bestD) { bestD = d; best = b; }
+      });
+      if (best) {
+        selectBri(best);
+        pendingBri = Math.round((Number(best.dataset.pct) / 100) * 254);
+        pendingBriVis = Number(best.dataset.vis) || 1;
+      }
+    }
+  } else {
+    // off / various / unknown -> no single current value: clear BOTH selections
+    // (so lights-off shows no color and no brightness chosen).
+    selectSwatch(null);
+    pendingColor = null;
+    selectBri(null);
+    pendingBri = null;
+  }
+  updateToggle();
+}
+
+// White segment = at least one light on in scope; gray = all off.
+function setTargetOccupancy(key, anyOn) {
+  const host = document.getElementById("light-targets");
+  if (!host || anyOn == null) return;
+  const btn = host.querySelector('[data-light-target="' + key + '"]');
+  if (btn) btn.classList.toggle("is-on", anyOn === true);
+}
+// UNIFORMITY across a target's scope. Returns one of:
+//   { state: "unknown" }                        - not read yet / offline
+//   { state: "off" }                            - every light off
+//   { state: "various" }                        - a mix (some off, or differing color/%)
+//   { state: "uniform", color: "Red", pct: 50 } - all on, one color, one brightness
+// The "can't be a color" lights (colorOff / whiteOnly members) are excluded — those
+// are the ones the app deliberately drops or keeps white during a colored scene, so
+// they shouldn't force VARIOUS on an otherwise-uniform scene.
+// Can this bulb actually show a hue? Color/extended-color lights carry a `hue`
+// field (and a colorgamut); dimmable-only and color-temperature ("white only")
+// bulbs do not. Used to keep white-only bulbs out of the uniform-color check.
+function lightCanColor(entry) {
+  const l = entry && entry.light;
+  if (!l) return false;
+  const st = l.state || {};
+  if (typeof st.hue === "number" || st.colormode === "hs" || st.colormode === "xy") return true;
+  const ctrl = l.capabilities && l.capabilities.control;
+  if (ctrl && ctrl.colorgamut) return true;
+  const t = (l.type || "").toLowerCase();
+  return t.indexOf("color") !== -1 && t.indexOf("temperature") === -1;
+}
+function targetUniformState(status) {
+  if (!status || !status.online) return { state: "unknown" };
+  const all = [];        // usable members, minus configured colorOff/whiteOnly
+  const colorCap = [];   // of those, the ones that can actually show a color
+  (status.parts || []).forEach((ps) => {
+    const part = ps.part || {};
+    const skip = (part.colorOff || []).concat(part.whiteOnly || []).concat(part.exclude || []);
+    const byId = lightEntryMap(ps.lights);
+    (part.members || []).forEach((id) => {
+      if (skip.indexOf(id) !== -1) return;
+      const entry = byId[id];
+      if (!(entry && lightState(entry) && lightIsUsable(entry))) return;
+      all.push(entry);
+      if (lightCanColor(entry)) colorCap.push(entry);
+    });
+  });
+  // Judge by the color-capable bulbs; only if there are none fall back to all
+  // (e.g. a scope of purely dimmable lights still reports White + %).
+  const list = colorCap.length ? colorCap : all;
+  if (!list.length) return status.on ? { state: "various" } : { state: "off" };
+  const onList = list.filter((e) => { const s = lightState(e); return s && s.on; });
+  if (onList.length === 0) return { state: "off" };
+  if (onList.length !== list.length) return { state: "various" };   // a mix of on and off
+  let colorName = null, pct = null;
+  for (const e of onList) {
+    const s = lightState(e);
+    const c = nearestSwatch(s).name;
+    const p = lightPct(s);
+    if (colorName === null) colorName = c; else if (c !== colorName) return { state: "various" };
+    if (pct === null) pct = p; else if (p == null || Math.abs(p - pct) > 3) return { state: "various" };
+  }
+  return { state: "uniform", color: colorName, pct: pct };
+}
+// A segment's second line: "{COLOR} {pct}%" / "OFF" / "VARIOUS" / "" (unknown).
+function targetLine2Text(status) {
+  const u = targetUniformState(status);
+  if (u.state === "off") return "OFF";
+  if (u.state === "various") return "VARIOUS";
+  if (u.state === "uniform") return u.pct != null ? u.color + " " + u.pct + "%" : u.color;
+  return "";
+}
+function setTargetLine2(key, text) {
+  const host = document.getElementById("light-targets");
+  if (!host) return;
+  const btn = host.querySelector('[data-light-target="' + key + '"]');
+  const sub = btn && btn.querySelector(".target-sub");
+  if (sub) sub.textContent = text || "";
+}
+// Read every segment's own scope and paint both its fill (occupancy) and its
+// second line (color + brightness, or OFF).
+function refreshTargetOccupancy() {
+  const host = document.getElementById("light-targets");
+  if (!host) return;
+  host.querySelectorAll("[data-light-target]").forEach((btn) => {
+    const key = btn.dataset.lightTarget;
+    if (!LIGHT_TARGETS[key]) return;
+    readLightTargetStatus(key).then((status) => {
+      lightTargetStatusByKey[key] = status;
+      if (status && status.online) setTargetOccupancy(key, status.on);
+      setTargetLine2(key, targetLine2Text(status));
+    }).catch(() => {});
+  });
+}
+
+function bindLightTargets() {
+  const host = document.getElementById("light-targets");
+  if (!host) return;
+  const btns = Array.from(host.querySelectorAll("[data-light-target]"));
+  host.style.setProperty("--seg-count", String(btns.length));
+  if (!host.querySelector(".target-thumb")) {          // the sliding selection ring
+    const thumb = document.createElement("span");
+    thumb.className = "target-thumb";
+    thumb.setAttribute("aria-hidden", "true");
+    host.appendChild(thumb);
+  }
+  btns.forEach((btn) => {
+    const target = LIGHT_TARGETS[btn.dataset.lightTarget];
+    if (!target) return;
+    // Line 1 = the target's name (icon + label); line 2 = its live state.
+    btn.innerHTML =
+      '<span class="target-top">' + (target.icon || "") +
+      '<span class="btn-label">' + target.label + "</span></span>" +
+      '<span class="target-sub" aria-hidden="true"></span>';
+    btn.addEventListener("click", () => selectLightTarget(btn.dataset.lightTarget));
+  });
+  selectLightTarget(CFG.defaultLightTarget || "room");
+  refreshTargetOccupancy();
+}
+
+/* ---------- Jarvis, the butler: a line that editorializes on each change ---------- */
+function fillLine(bank, vars) {
+  const s = bank[Math.floor(Math.random() * bank.length)] || "";
+  return s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : ""));
+}
+function jarvisRemark() {
+  const label = currentLightTarget().label;
+  const t2 = label.replace(/\s+Lights$/i, "").trim();   // "Whole House", "Living Room"
+  const vars = { t: label, t2: t2, c: lightsColor || "White", p: lightsBri != null ? lightsBri : 100 };
+  if (lightsOn === false) {
+    return fillLine([
+      "{t2}, extinguished. Dramatic.",
+      "Lights out in the {t2}. Bold move.",
+      "{t2} off. I'll be here in the dark, then.",
+      "Darkness it is. Very mysterious of you.",
+    ], vars);
+  }
+  if (lightsOn !== true) return "";
+  // Tone tracks the %: hushed when low, easy in the middle, brazen when high.
+  // Every line names the color and the brightness. And every line is a little sassy.
+  let bank;
+  if (vars.p <= 25) {          // low — never "bold" down here
+    bank = [
+      "{c} at {p}%. Barely trying, but I respect it.",
+      "A moody {c}, {p}%. Very film-noir of you.",
+      "{c} dimmed to {p}%. Setting a mood, are we?",
+      "{p}% {c}. Practically candlelight — I'll pretend it's lighting.",
+      "{c}, {p}%. Cozy. Or you forgot to turn it up. No judgment.",
+      "Whispering {c} at {p}%. Intimate. I'll avert my eyes.",
+      "{c} at {p}%. Romantic, or you're hiding something.",
+    ];
+  } else if (vars.p >= 75) {   // high — go big
+    bank = [
+      "{c} at {p}%. Now THAT is a statement.",
+      "Full {c}, {p}%. Blinding. Magnificent. Mildly aggressive.",
+      "{c} cranked to {p}%. Subtlety has left the building.",
+      "{p}% {c}. Bold. I'm practically getting a tan.",
+      "{c} at {p}%. Go big or go home, evidently.",
+      "Blazing {c}, {p}%. The neighbors say hello.",
+      "{c} at {p}%. Maximum drama. I approve.",
+    ];
+  } else {                     // middle — sensible, faintly unimpressed
+    bank = [
+      "{c} at {p}%. Sensible. How refreshingly boring.",
+      "{p}% {c}. The Goldilocks setting. Well played.",
+      "{c}, {p}%. Comfortable, adequate, chef's kiss, I suppose.",
+      "A tasteful {c} at {p}%. Look at you, having taste.",
+      "{c} at {p}%. Not too much, not too little. Diplomatic.",
+      "{p}% of {c}. Perfectly reasonable. Yawn.",
+    ];
+  }
+  return fillLine(bank, vars);
+}
+// Music-deck remark — reflects what the Sonos is doing.
+function jarvisMusicRemark() {
+  const room = ROOM_LABEL;
+  if (npTv) return fillLine(["TV audio in the {r}.", "Playing the telly through the {r}."], { r: room });
+  const track = (npTrack || npStation || npPlaylist || "").trim();
+  if (!npPlaying || !track) {
+    return fillLine(["Silence in the {r}, for now.", "Nothing playing.", "The {r} is quiet."], { r: room });
+  }
+  return fillLine(["Now playing: {x} · {v}%.", "{x}, at {v}%.", "Spinning {x} — {v}%."], { x: track, v: sonosVol });
+}
+let lastJarvisKey = null;
+function sayJarvis(force) {
+  const el = document.getElementById("jarvis-line");
+  if (!el) return;
+  // Match the active deck; only re-phrase when the state actually changes (so a
+  // status poll doesn't keep reshuffling the wording).
+  const music = document.getElementById("deck-music");
+  const onMusic = !!(music && music.classList.contains("deck-active"));
+  const key = onMusic
+    ? ["music", npPlaying, npTv, npTrack, npStation, npPlaylist, sonosMuted, sonosVol].join("|")
+    : ["lights", selectedLightTargetKey, lightsOn, lightsColor, lightsBri].join("|");
+  if (!force && key === lastJarvisKey) return;
+  lastJarvisKey = key;
+  el.textContent = (onMusic ? jarvisMusicRemark() : jarvisRemark()) || "";   // unsigned
 }
 
 // The "Lights" deck tab reflects status: "Lights 75%" when on, "Lights Off"
@@ -1098,84 +1696,120 @@ function updateLightsTab() {
 // "Bed Lights Off" — but only while the Lights deck is showing.
 function updateHeroStatus() {
   const el = document.getElementById("hero-status");
+  const colorEl = document.getElementById("hero-color");   // sits between "Lights" and the %
   if (!el) return;
   const lights = document.getElementById("deck-lights");
   const music = document.getElementById("deck-music");
-  if (lights && lights.classList.contains("deck-active")) {          // Lights: brightness
-    if (lightsOn === true) el.textContent = lightsBri != null ? lightsBri + "%" : "";
-    else if (lightsOn === false) el.textContent = "Off";
-    else el.textContent = "";
-  } else if (music && music.classList.contains("deck-active")) {     // Music: volume
-    el.textContent = sonosMuted ? "Muted" : sonosVol + "%";
+  const titleOnly = !!document.getElementById("light-targets") || CFG.heroPlain === "true";
+  if (lights && lights.classList.contains("deck-active")) {          // Lights deck
+    if (titleOnly) {
+      // Title = "<Room> <deck word>" only (e.g. "Living Room Lights"); the Jarvis
+      // line / target buttons carry the actual state, so drop color + %.
+      if (colorEl) colorEl.textContent = "";
+      el.textContent = "";
+    } else if (lightsOn === true) {                                 // Lights: color + brightness
+      if (colorEl) colorEl.textContent = lightsColor || "";
+      el.textContent = lightsBri != null ? lightsBri + "%" : "";
+    } else if (lightsOn === false) {
+      if (colorEl) colorEl.textContent = "OFF";
+      el.textContent = "";
+    } else {
+      if (colorEl) colorEl.textContent = "";
+      el.textContent = "";
+    }
+  } else if (music && music.classList.contains("deck-active")) {     // Music deck
+    if (colorEl) colorEl.textContent = "";
+    // Plain-header pages (e.g. Living) show just "<Room> Music"; others append volume.
+    el.textContent = CFG.heroPlain === "true" ? "" : (sonosMuted ? "Muted" : sonosVol + "%");
   } else {
+    if (colorEl) colorEl.textContent = "";
     el.textContent = "";
   }
+  sayJarvis();   // keep the Jarvis line matched to the active deck + state
+}
+
+// Enact the staged color + brightness on the selected target (turn on / off in place).
+// Called immediately when a brightness box is picked. opts.live = true for the
+// throttled updates while a finger is dragging down the column: those skip the
+// toast, the butler line, and the follow-up bridge read (the final release does
+// the full version).
+function engageLights(opts) {
+  opts = opts || {};
+  const live = !!opts.live;
+  const targetKey = selectedLightTargetKey;
+  const target = currentLightTarget();
+  const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
+  const rememberTargetStatus = (body) => {
+    lightTargetStatusByKey[targetKey] = optimisticLightTargetStatus(target, body);
+  };
+  if (isOff) {
+    // the chosen setting is itself "off" (black or 0%) -> apply off
+    applyLights({ on: false, transitiontime: 0 });   // snap, no fade
+    dirty = false;
+    rememberTargetStatus({ on: false });
+    lightsOn = false;
+    lightsColor = null; lightsBri = null;   // optimistic: room is now off
+    setTargetOccupancy(targetKey, false);
+    setTargetLine2(targetKey, "OFF");
+    if (!live) { toast(target.label + " off."); sayJarvis(); }
+  } else {
+    // enact the current selection (turn on / update in place); keep selection
+    const body = pendingColor && pendingColor.body ? Object.assign({}, pendingColor.body) : { on: true };
+    if (pendingBri != null && pendingBri > 0) body.bri = pendingBri;
+    body.transitiontime = 0;   // snap to the new color/brightness, no fade
+    applyLights(body);   // colored scene skips the office lamp; white/off include it
+    dirty = false;
+    rememberTargetStatus(body);
+    lightsOn = true;
+    // optimistic: room now matches the staged selection (switch flips on)
+    lightsColor = pendingColor ? pendingColor.name : null;
+    lightsBri = pendingBri != null ? Math.round((pendingBri / 254) * 100) : 100;
+    setTargetOccupancy(targetKey, true);
+    setTargetLine2(targetKey, (lightsColor || "White") + " " + lightsBri + "%");
+    if (!live) { toast(target.label + " engaged."); sayJarvis(); }
+  }
+  updateToggle();
+  updateLightsTab();   // header color/% + deck-tab reflect the new state at once
+  if (!live) {
+    window.setTimeout(() => {                            // confirm from bridge
+      updateLightsStatus();
+      if (targetKey !== "room") refreshLightTargetStatus(targetKey);
+      refreshTargetOccupancy();
+    }, 500);
+  }
+}
+
+// Live dimming: while dragging the brightness column, apply at most ~1x/150ms so
+// the bulbs track the finger without flooding the bridge. Always trailing-edge
+// so the last position lands even if it arrived mid-throttle.
+let briLiveTimer = null, briLivePending = false;
+function engageLightsLive() {
+  if (briLiveTimer) { briLivePending = true; return; }
+  engageLights({ live: true });
+  briLiveTimer = window.setTimeout(() => {
+    briLiveTimer = null;
+    if (briLivePending) { briLivePending = false; engageLightsLive(); }
+  }, 150);
+}
+function engageLightsFinal() {
+  if (briLiveTimer) { window.clearTimeout(briLiveTimer); briLiveTimer = null; }
+  briLivePending = false;
+  engageLights();
 }
 
 function bindLightsToggle() {
   const btn = document.getElementById("lights-toggle");
   if (!btn) return;
-  const doEngage = () => {
-    const isOff = pendingBri === 0 || (pendingColor && pendingColor.off);
-    if (isOff) {
-      // the chosen setting is itself "off" (black or 0%) -> apply off
-      runHue({ on: false });                // this room's group, on this room's bridge
-      resetLightControls();
-      lightsOn = false;
-      lightsColor = null; lightsBri = null;   // optimistic: room is now off
-      toast(ROOM_LABEL + " lights off.");
-    } else {
-      // enact the current selection (turn on / update in place); keep selection
-      const body = pendingColor && pendingColor.body ? Object.assign({}, pendingColor.body) : { on: true };
-      if (pendingBri != null && pendingBri > 0) body.bri = pendingBri;
-      applyLights(body);   // colored scene skips the office lamp; white/off include it
-      dirty = false;
-      lightsOn = true;
-      // optimistic: room now matches the staged selection (switch flips on)
-      lightsColor = pendingColor ? pendingColor.name : null;
-      lightsBri = pendingBri != null ? Math.round((pendingBri / 254) * 100) : 100;
-      toast(ROOM_LABEL + " lights engaged.");
-    }
-    updateToggle();
-    window.setTimeout(updateLightsStatus, 500);          // confirm from bridge
-  };
-  // Swipe down = turn off this room's lights (group incl. the office lamp), like
-  // the BEDROOM LIGHTS OFF button. Keeps the staged selection.
-  const doOff = () => {
-    runHue({ on: false });
-    lightsOn = false; lightsColor = null; lightsBri = null;   // optimistic: paddle drops
-    toast(ROOM_LABEL + " lights off.");
-    updateToggle();
-    window.setTimeout(updateLightsStatus, 500);
-  };
-
-  // Tap or swipe up = engage; swipe down = off.
-  let sx = 0, sy = 0, tracking = false, swiped = false;
-  btn.addEventListener("touchstart", (e) => {
-    const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; tracking = true; swiped = false;
-  }, { passive: true });
-  btn.addEventListener("touchend", (e) => {
-    if (!tracking) return; tracking = false;
-    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    if (Math.abs(dy) > 28 && Math.abs(dy) > Math.abs(dx)) {   // a clear vertical swipe
-      swiped = true;
-      if (dy < 0) doEngage(); else doOff();                  // up = on, down = off
-    }
-  }, { passive: true });
-  btn.addEventListener("click", () => {
-    if (swiped) { swiped = false; return; }   // the swipe already handled it
-    // tap/click toggles: if the switch is up (on) turn off, else engage
-    if (btn.classList.contains("engaged")) doOff();
-    else doEngage();
-  });
+  btn.addEventListener("click", engageLightsFinal);
 }
 
 // Turn off only THIS room's lights (its own Hue group, on its own bridge).
 function bindRoomOff() {
   const btn = document.getElementById("room-off");
   if (!btn) return;
-  btn.textContent = ROOM_LABEL.toUpperCase() + " LIGHTS OFF";
+  setIconButtonLabel(btn, ROOM_OFF_ICONS[ROOM], ROOM_LABEL.toUpperCase() + " LIGHTS OFF");
   btn.addEventListener("click", () => {
+    if (isOffDisabled(btn)) return;
     runHue({ on: false });
     toast(ROOM_LABEL + " lights off.");
     window.setTimeout(updateLightsStatus, 500);
@@ -1188,8 +1822,9 @@ function bindHouseOff() {
   if (!btn) return;
   const foh = HUE_BRIDGE === "main";
   const label = foh ? "FRONT OF HOUSE OFF" : "BACK OF HOUSE OFF";
-  btn.textContent = label;
+  setIconButtonLabel(btn, HOUSE_ICON, label);
   btn.addEventListener("click", () => {
+    if (isOffDisabled(btn)) return;
     runHueProxy({ path: "/groups/0/action", body: { on: false } });
     toast((foh ? "Front" : "Back") + " of house off.");
     window.setTimeout(updateLightsStatus, 500);
@@ -1199,8 +1834,9 @@ function bindHouseOff() {
 function bindHouseOffAll() {
   const btn = document.getElementById("house-off-all");
   if (!btn) return;
-  btn.textContent = "WHOLE HOUSE OFF";
+  setIconButtonLabel(btn, HOUSE_ICON, "WHOLE HOUSE OFF");
   btn.addEventListener("click", () => {
+    if (isOffDisabled(btn)) return;
     HUE_ALL_BRIDGES.forEach((bridge) => {
       fetch(piUrl("/hue"), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bridge: bridge, path: "/groups/0/action", body: { on: false } }),
@@ -1211,11 +1847,14 @@ function bindHouseOffAll() {
   });
 }
 
-// Gray out an OFF button when its action would do nothing (all target lights
-// are already off). Native `disabled` also blocks the click.
+function isOffDisabled(btn) {
+  return !!btn && btn.getAttribute("aria-disabled") === "true";
+}
+// Mark an OFF action as inactive when it would do nothing. Do not use native
+// disabled here; Safari restyles disabled buttons and breaks the nav-button look.
 function setOffDisabled(btn, disabled) {
   if (!btn) return;
-  btn.disabled = !!disabled;
+  btn.disabled = false;
   btn.setAttribute("aria-disabled", disabled ? "true" : "false");
 }
 // Refresh the three OFF buttons' disabled state against live bridge status:
@@ -1247,18 +1886,26 @@ function refreshOffButtons() {
 }
 
 /* ---------- Color swatches (col 1) + brightness preset boxes (col 2) ---------- */
-// Brightness shown as 7 stacked boxes, top -> bottom.
-const BRI_PRESETS = [100, 90, 75, 50, 25, 10, 1];
+// Brightness shown as stacked boxes, top -> bottom. 0 is the selected-target off command.
+const BRI_PRESETS = [100, 90, 75, 50, 25, 10, 1, 0];
 // Display-only shade per box: spread evenly from full (top row) down to
 // BRI_VIS_MIN (bottom row) so all 7 look distinct even though the real light
 // values bunch up at the low end. Labels + actual light settings are unaffected.
 const BRI_VIS_MIN = 0.22;
 // Per-preset display-shade overrides (by label %). Tweak these freely; they only
 // change how a box/Engage looks, never the label or the light value.
-const BRI_VIS_OVERRIDE = { 1: 0.25 };
+const BRI_VIS_OVERRIDE = { 1: 0.25, 0: 0 };
 function briVis(i, n, p) {
   if (BRI_VIS_OVERRIDE[p] != null) return BRI_VIS_OVERRIDE[p];
   return n <= 1 ? 1 : 1 - (i / (n - 1)) * (1 - BRI_VIS_MIN);
+}
+// The display shade for a given brightness %, matching the nearest "Choose
+// Brightness" box — used to dim the page tint the same way.
+function briVisForPct(pct) {
+  if (pct == null) return 1;
+  let bi = 0, bd = Infinity;
+  BRI_PRESETS.forEach((p, i) => { const d = Math.abs(p - pct); if (d < bd) { bd = d; bi = i; } });
+  return briVis(bi, BRI_PRESETS.length, BRI_PRESETS[bi]);
 }
 
 function selectBri(el) {
@@ -1270,13 +1917,13 @@ function selectBri(el) {
 // Tap or slide a finger across a column of pickable boxes (each carries __pick).
 function bindStripPick(container, itemSel) {
   if (!container) return;
-  let picking = false, dragged = false, lastEl = null;
+  let picking = false, pointerUsed = false, lastEl = null;
   const itemAt = (x, y) => {
     const el = document.elementFromPoint(x, y);
     return el && el.closest ? el.closest(itemSel) : null;
   };
   container.addEventListener("pointerdown", (e) => {
-    picking = true; dragged = false; lastEl = null;
+    picking = true; pointerUsed = true; lastEl = null;
     if (container.setPointerCapture) container.setPointerCapture(e.pointerId);
     const it = itemAt(e.clientX, e.clientY);
     if (it && it.__pick) { it.__pick(false); lastEl = it; }
@@ -1285,18 +1932,20 @@ function bindStripPick(container, itemSel) {
   container.addEventListener("pointermove", (e) => {
     if (!picking) return;
     const it = itemAt(e.clientX, e.clientY);
-    if (it && it.__pick && it !== lastEl) { dragged = true; it.__pick(false); lastEl = it; }
+    if (it && it.__pick && it !== lastEl) { it.__pick(false); lastEl = it; }
   });
   const end = () => {
     if (!picking) return;
     picking = false;
-    if (dragged && lastEl && lastEl.__pick) lastEl.__pick(true);   // announce final pick
+    // Commit the final element here (works for both tap and drag). preventDefault on
+    // pointerdown can swallow the click event on touch, so don't rely on click for taps.
+    if (lastEl && lastEl.__pick) lastEl.__pick(true);
   };
   container.addEventListener("pointerup", end);
   container.addEventListener("pointercancel", end);
-  container.addEventListener("click", (e) => {                     // tap / keyboard
+  container.addEventListener("click", (e) => {                     // keyboard / synthetic only
+    if (pointerUsed) { pointerUsed = false; return; }              // pointer path already committed
     const it = e.target.closest ? e.target.closest(itemSel) : null;
-    if (dragged) { dragged = false; return; }
     if (it && it.__pick) it.__pick(true);
   });
 }
@@ -1312,11 +1961,21 @@ function paintBriBoxes(css) {
     const vf = Number(box.dataset.vis);   // display shade (spread, floored) — set at build
     const r = Math.round(rgb[0] * vf), g = Math.round(rgb[1] * vf), b = Math.round(rgb[2] * vf);
     box.style.background = "rgb(" + r + "," + g + "," + b + ")";
-    box.style.color = text;
+    box.style.color = box.dataset.pct === "0" ? "#ffffff" : text;
   });
 }
 
 function bindLightTools() {
+  // Jarvis's line sits inside the header, right under the title words.
+  const title = document.querySelector(".kitchen-head .kitchen-title");
+  if (title && !document.getElementById("jarvis-line")) {
+    const line = document.createElement("p");
+    line.id = "jarvis-line";
+    line.className = "jarvis-line";
+    line.textContent = "At your service.";
+    title.insertAdjacentElement("afterend", line);
+  }
+
   // Column 1 — colors (White top -> Purple bottom)
   const swatches = document.getElementById("swatches");
   if (swatches) {
@@ -1336,7 +1995,11 @@ function bindLightTools() {
         pendingColor = { body: c.body, css: c.css, name: c.name, off: c.off };
         dirty = true;
         updateToggle();
-        if (announce) toast(c.name + " ready — press Engage.");
+        if (!announce) return;
+        // Lights already on -> recolor them in place at once. Off -> just stage the
+        // color; the user picks a brightness (which turns them on).
+        if (lightsOn === true) engageLightsFinal();
+        else toast(c.name + " — now choose a brightness.");
       };
       swatches.appendChild(b);
     });
@@ -1355,8 +2018,9 @@ function bindLightTools() {
       box.dataset.vis = String(vis);
       const v = Math.round(vis * 255);
       box.style.background = "rgb(" + v + "," + v + "," + v + ")";
-      box.textContent = p + "%";
-      box.setAttribute("aria-label", p + "% brightness");
+      const label = p === 0 ? "OFF" : p + "%";
+      box.textContent = label;
+      box.setAttribute("aria-label", p === 0 ? "Off" : p + "% brightness");
       box.__pick = (announce) => {
         if (selectedBriEl === box && !announce) return;
         selectBri(box);
@@ -1364,7 +2028,11 @@ function bindLightTools() {
         pendingBriVis = vis;
         dirty = true;
         updateToggle();
-        if (announce) toast(p + "% ready — press Engage.");
+        // Picking a brightness engages color + brightness immediately (no Engage tap).
+        // announce = the finger lifted (final) -> full engage; otherwise it's a drag
+        // step -> live throttled dim so the lights track the finger.
+        if (announce) engageLightsFinal();
+        else engageLightsLive();
       };
       briBoxes.appendChild(box);
     });
@@ -1527,6 +2195,28 @@ function bindSoonRooms() {
   });
 }
 
+function ensureSonosCompanion() {
+  if (!CFG.sonosEnsureCompanion) return;
+  fetch(piUrl("/sonos/ensure-companion"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: withRoom({}),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+let syncingCompanionVolume = false;
+function syncSonosCompanionVolume() {
+  if (!CFG.sonosSyncCompanionVolume || syncingCompanionVolume || document.hidden) return;
+  syncingCompanionVolume = true;
+  fetch(piUrl("/sonos/sync-companion-volume"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: withRoom({}),
+    keepalive: true,
+  }).catch(() => {}).then(() => { syncingCompanionVolume = false; });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   setGreeting();
   renderChannels();
@@ -1540,6 +2230,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindHouseOffAll();
   bindDragScroll();
   bindLightTools();
+  bindLightTargets();
   resetLightControls();     // default selection: white + 100%
   bindVolume();
   bindVolBoxes();
@@ -1548,6 +2239,12 @@ document.addEventListener("DOMContentLoaded", () => {
   bindTv();
   bindPlayPause();
   bindSkip();
+  ensureSonosCompanion();
+  syncSonosCompanionVolume();
+  if (CFG.sonosSyncCompanionVolume) {
+    window.setInterval(syncSonosCompanionVolume, 4000);
+    window.addEventListener("visibilitychange", () => { if (!document.hidden) syncSonosCompanionVolume(); });
+  }
   if (!document.querySelector(".room-grid")) {
     updateLightsStatus();      // room page: its own lights section + hero tint
     window.setInterval(updateLightsStatus, 8000);   // keep status + OFF-button enabled states fresh

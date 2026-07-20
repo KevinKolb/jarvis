@@ -14,6 +14,7 @@ import html
 import json
 import os
 import re
+import subprocess
 import time
 import urllib.request
 import urllib.parse
@@ -34,8 +35,11 @@ SONOS_IP   = "192.168.86.48"                # LOUNGE — whole-house music sourc
 SONOS_UUID = "RINCON_F0F6C1CF5CCA01400"     # lounge coordinator UUID
 KITCHEN_IP = "192.168.86.41"                # kitchen stereo pair
 KITCHEN_UUID = "RINCON_7828CAE1ACD801400"   # kitchen pair coordinator UUID
-SONOS_SN    = "9"                           # Apple Music account serial on this system
-SONOS_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"   # Apple Music service token
+APPLE_SID = "204"
+APPLE_CATALOG_SN = "9"
+APPLE_LIBRARY_SN = "29"
+APPLE_CATALOG_CDUDN = "SA_RINCON52231_X_#Svc52231-0-Token"
+APPLE_LIBRARY_CDUDN = "SA_RINCON52231_X_#Svc52231-24d75e61-Token"
 # Per-room Sonos target: coordinator ip/uuid, and a speaker that secretly
 # joins it ("join", kitchen only).  A page picks its target with ?room=/…"room".
 SONOS_TARGETS = {
@@ -58,20 +62,17 @@ ALL_ROOMS = {
 SHARE_ROOMS = {
     # House page: lounge is the coordinator (music source), so it's left out.
     "house": [("Kitchen", ALL_ROOMS["Kitchen"]), ("Living Room", ALL_ROOMS["Living Room"]),
-              ("Bedroom", ALL_ROOMS["Bedroom"]), ("Office", ALL_ROOMS["Office"]),
-              ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
+              ("Entryway", ALL_ROOMS["Entryway"]), ("Bathroom", ALL_ROOMS["Bathroom"]),
+              ("Bedroom", ALL_ROOMS["Bedroom"])],
     "kitchen": [("Lounge", ALL_ROOMS["Lounge"]), ("Living Room", ALL_ROOMS["Living Room"]),
-                ("Bedroom", ALL_ROOMS["Bedroom"]), ("Office", ALL_ROOMS["Office"]),
-                ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
-    # Office is left out on purpose: it's the bedroom's permanent companion (auto-
-    # joined on every play), not a toggle. Bedroom is always its coordinator/host.
+                ("Entryway", ALL_ROOMS["Entryway"])],
+    # Office is left out on purpose: it's the bedroom's permanent companion,
+    # not a standalone Play In toggle. The Bedroom target carries Office with it.
     "bedroom": [("Kitchen", ALL_ROOMS["Kitchen"]), ("Lounge", ALL_ROOMS["Lounge"]),
-                ("Living Room", ALL_ROOMS["Living Room"]),
-                ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
-    "bathroom": [("Bedroom", ALL_ROOMS["Bedroom"])],
+                ("Living Room", ALL_ROOMS["Living Room"]), ("Entryway", ALL_ROOMS["Entryway"])],
+    "bathroom": [],
     "living": [("Kitchen", ALL_ROOMS["Kitchen"]), ("Lounge", ALL_ROOMS["Lounge"]),
-               ("Bedroom", ALL_ROOMS["Bedroom"]), ("Office", ALL_ROOMS["Office"]),
-               ("Bathroom", ALL_ROOMS["Bathroom"]), ("Entryway", ALL_ROOMS["Entryway"])],
+               ("Entryway", ALL_ROOMS["Entryway"])],
 }
 SONOS_ROOMS = SHARE_ROOMS["kitchen"]        # back-compat alias
 # Share buttons that pull a companion speaker along, so the two move as a unit.
@@ -84,6 +85,15 @@ SHARE_COMPANIONS = {
 # Live playback context that Sonos' metadata doesn't carry (e.g. which
 # playlist is playing — the queue only exposes the current track).
 STATE = {"playlist": "", "category": ""}   # category = which music row is playing (for next/back)
+APPLE_TV_HELPER = os.path.join(os.path.dirname(__file__), "appletv_state.py")
+APPLE_TV_RUNNER = ["/usr/bin/sudo", "-u", "pi", "/usr/bin/python3", APPLE_TV_HELPER]
+APPLE_TV_TARGETS = {
+    # Discovered by pyatv on the Pi. Update IDs here if an Apple TV is renamed/replaced.
+    "bedroom": {"id": "6AAA1631156A", "name": "Bedroom TV", "host": "192.168.86.36"},
+    "living": {"id": "6AF007203F02", "name": "TV", "host": "192.168.86.246"},
+}
+APPLE_TV_CACHE = {}
+APPLE_TV_CACHE_TTL = 8
 # ------------------------------------------------------------------------
 
 ROOM_ALIASES = {
@@ -339,19 +349,34 @@ class Handler(SimpleHTTPRequestHandler):
         vol = self._hold_begin()            # mute + hold volume across the source change
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         title = title or "Apple Music"
+        kind = (kind or "song").lower()
         STATE["playlist"] = title if kind in ("playlist", "libraryplaylist") else ""
         if kind == "album":
-            res = "x-rincon-cpcontainer:1004206calbum%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
+            res = "x-rincon-cpcontainer:1004206calbum%%3a%s?sid=%s&flags=8300&sn=%s" % (cid, APPLE_SID, APPLE_CATALOG_SN)
             item_id, cls = "1004206calbum%%3a%s" % cid, "object.container.album.musicAlbum.#AlbumView"
+            cdudn = APPLE_CATALOG_CDUDN
+        elif kind == "libraryalbum":
+            res = "x-rincon-cpcontainer:1004206clibraryalbum%%3a%s?sid=%s&flags=8300&sn=%s" % (cid, APPLE_SID, APPLE_CATALOG_SN)
+            item_id, cls = "1004206clibraryalbum%%3a%s" % cid, "object.container.album.musicAlbum.#AlbumView"
+            cdudn = APPLE_CATALOG_CDUDN
         elif kind == "libraryplaylist":
-            res = "x-rincon-cpcontainer:1006206clibraryplaylist%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
-            item_id, cls = "1006206clibraryplaylist%%3a%s" % cid, "object.container.playlistContainer"
+            res = "x-rincon-cpcontainer:1006206clibraryplaylist%%3A%s?sid=%s&flags=8300&sn=%s" % (cid, APPLE_SID, APPLE_LIBRARY_SN)
+            item_id, cls = "1006206clibraryplaylist%%3A%s" % cid, "object.container.playlistContainer"
+            cdudn = APPLE_LIBRARY_CDUDN
         elif kind == "playlist":
-            res = "x-rincon-cpcontainer:1006206cplaylist%%3a%s?sid=204&flags=8300&sn=%s" % (cid, SONOS_SN)
-            item_id, cls = "1006206cplaylist%%3a%s" % cid, "object.container.playlistContainer"
+            res = "x-rincon-cpcontainer:1006206cplaylist%%3A%s?sid=%s&flags=8300&sn=%s" % (cid, APPLE_SID, APPLE_LIBRARY_SN)
+            item_id, cls = "1006206cplaylist%%3A%s" % cid, "object.container.playlistContainer"
+            cdudn = APPLE_LIBRARY_CDUDN
+        elif kind == "librarytrack":
+            res = "x-sonos-http:librarytrack%%3A%s.mp4?sid=%s&flags=8232&sn=%s" % (cid, APPLE_SID, APPLE_LIBRARY_SN)
+            item_id, cls = "10032028librarytrack%%3A%s" % cid, "object.item.audioItem.musicTrack"
+            cdudn = APPLE_LIBRARY_CDUDN
+        elif kind == "artist":
+            raise Exception("Apple Music artist links cannot be queued directly; use an Apple Music playlist")
         else:  # song
-            res = "x-sonos-http:song%%3a%s.mp4?sid=204&flags=8224&sn=%s" % (cid, SONOS_SN)
-            item_id, cls = "10032020song%%3a%s" % cid, "object.item.audioItem.musicTrack"
+            res = "x-sonos-http:song%%3A%s.mp4?sid=%s&flags=8232&sn=%s" % (cid, APPLE_SID, APPLE_CATALOG_SN)
+            item_id, cls = "10032028song%%3A%s" % cid, "object.item.audioItem.musicTrack"
+            cdudn = APPLE_CATALOG_CDUDN
         meta = ('<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
                 'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
                 'xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" '
@@ -359,10 +384,9 @@ class Handler(SimpleHTTPRequestHandler):
                 '<item id="%s" parentID="0" restricted="true"><dc:title>%s</dc:title>'
                 '<upnp:class>%s</upnp:class>'
                 '<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">%s</desc>'
-                '</item></DIDL-Lite>') % (item_id, esc(title), cls, SONOS_CDUDN)
+                '</item></DIDL-Lite>') % (item_id, esc(title), cls, cdudn)
         self._sonos("AVTransport", "RemoveAllTracksFromQueue",
             '<u:RemoveAllTracksFromQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:RemoveAllTracksFromQueue>')
-        self._set_play_mode(shuffle)   # set mode BEFORE building the queue so albums aren't scrambled by a prior shuffle
         self._sonos("AVTransport", "AddURIToQueue",
             '<u:AddURIToQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
             '<EnqueuedURI>%s</EnqueuedURI><EnqueuedURIMetaData>%s</EnqueuedURIMetaData>'
@@ -371,6 +395,7 @@ class Handler(SimpleHTTPRequestHandler):
         self._sonos("AVTransport", "SetAVTransportURI",
             '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
             '<CurrentURI>x-rincon-queue:%s#0</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
+        self._set_play_mode(shuffle)
         # track 1: seek to queue position 1 so it never starts mid-album
         if not shuffle:
             self._sonos("AVTransport", "Seek",
@@ -493,6 +518,23 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             return None
 
+    def _speaker_volume(self, ip):
+        """Current volume for one speaker IP, or None if it can't be read."""
+        try:
+            xml = self._rc_ip(ip, "GetVolume",
+                '<u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+                '<Channel>Master</Channel></u:GetVolume>').decode("utf-8", "ignore")
+            m = re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", xml)
+            return int(m.group(1)) if m else None
+        except Exception:
+            return None
+
+    def _set_speaker_volume(self, ip, vol):
+        vol = max(0, min(100, int(vol)))
+        self._rc_ip(ip, "SetVolume",
+            '<u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID>'
+            '<Channel>Master</Channel><DesiredVolume>%d</DesiredVolume></u:SetVolume>' % vol)
+
     def _restore_volume(self, vol):
         """Force every speaker in this room's group back to `vol`. Switching source
         (esp. to/from the TV input) makes Sonos jump to a per-source remembered
@@ -545,15 +587,31 @@ class Handler(SimpleHTTPRequestHandler):
         """Join this room's default companion (s_join) to its coordinator on every
         play. Kitchen: the hidden kitchen pair joins the lounge coordinator (the
         'Kitchen' illusion). Bedroom: the Office speaker joins bedroom by default
-        (no illusion — bedroom is the real coordinator). No-op when s_join is None."""
+        (no illusion — bedroom is the real coordinator). No-op when s_join is None.
+        Returns True only when it actually sends a group command."""
         if not self.s_join:
-            return
+            return False
+        if self._companion_grouped():
+            return False
         try:
             self._avt_ip(self.s_join, "SetAVTransportURI",
                 '<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID>'
                 '<CurrentURI>x-rincon:%s</CurrentURI><CurrentURIMetaData></CurrentURIMetaData></u:SetAVTransportURI>' % self.s_uuid)
+            return True
+        except Exception:
+            return False
+
+    def _companion_grouped(self):
+        """True when the room's default companion is already in this room's group."""
+        if not self.s_join:
+            return False
+        try:
+            for _coord, ips in self._zone_groups():
+                if self.s_ip in ips:
+                    return self.s_join in ips
         except Exception:
             pass
+        return False
 
     def _lounge_muted(self):
         """True if the lounge speaker is muted (used as the Lounge button's off-state)."""
@@ -571,6 +629,32 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(obj).encode())
+
+    def _apple_tv_state(self):
+        """Best-effort Apple TV metadata for this room, cached briefly."""
+        target = APPLE_TV_TARGETS.get(self.s_room)
+        if not target:
+            return {"ok": True, "available": False, "room": self.s_room, "error": "no_target"}
+        now = time.time()
+        cached = APPLE_TV_CACHE.get(self.s_room)
+        if cached and now - cached[0] < APPLE_TV_CACHE_TTL:
+            return cached[1]
+        cmd = APPLE_TV_RUNNER + ["--id", target["id"], "--room", self.s_room]
+        if target.get("host"):
+            cmd += ["--host", target["host"]]
+        try:
+            raw = subprocess.check_output(
+                cmd, cwd=os.path.dirname(__file__), stderr=subprocess.STDOUT, timeout=7)
+            lines = raw.decode("utf-8", "ignore").strip().splitlines()
+            json_line = next((line for line in reversed(lines) if line.strip().startswith("{")), "")
+            state = json.loads(json_line)
+        except Exception as exc:
+            state = {"ok": False, "available": False, "room": self.s_room,
+                     "id": target["id"], "name": target.get("name", ""), "error": str(exc)}
+        state.setdefault("room", self.s_room)
+        state.setdefault("name", target.get("name", ""))
+        APPLE_TV_CACHE[self.s_room] = (now, state)
+        return state
 
     def do_GET(self):
         q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -693,13 +777,24 @@ class Handler(SimpleHTTPRequestHandler):
                 playlist = STATE["playlist"] if (cur_uri.startswith("x-rincon-queue") and STATE["playlist"]) else ""
                 # TV (HDMI/optical) input — report it plainly, no track/station/art
                 tv = cur_uri.startswith("x-sonos-htastream")
+                apple_tv = None
                 if tv:
-                    song, st, art, playlist = "TV playing", "", "", ""
+                    song, st, art, playlist = "TV MODE", "", "", ""
                     playing = True
+                    apple_tv = self._apple_tv_state()
+                    if apple_tv and apple_tv.get("available"):
+                        title = apple_tv.get("display_title") or apple_tv.get("title") or ""
+                        subtitle = apple_tv.get("subtitle") or ""
+                        if title:
+                            song = title
+                            st = subtitle
+                        elif subtitle:
+                            st = subtitle
+                        art = apple_tv.get("art") or ""
                 category = "" if tv else STATE.get("category", "")
                 self._json({"volume": vol, "mute": mute, "playing": playing, "tv": tv,
                             "track": song, "station": st, "playlist": playlist,
-                            "art": art, "category": category})
+                            "art": art, "category": category, "apple_tv": apple_tv})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return
@@ -725,6 +820,9 @@ class Handler(SimpleHTTPRequestHandler):
         # Music buttons config (for the kitchen page + admin)
         if sp == "/music":
             self._json(load_music())
+            return
+        if sp == "/appletv/state":
+            self._json(self._apple_tv_state())
             return
         # Read light state:  GET /hue/<bridge>/groups/82  ->  that bridge /groups/82
         if self.path.startswith("/hue/"):
@@ -934,6 +1032,42 @@ class Handler(SimpleHTTPRequestHandler):
                                 pass
                 self._ensure_kitchen_grouped()        # re-attach the room's own companion (no-op if none)
                 self._json({"ok": True, "solo": False, "ungrouped": True})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Re-attach this room's default companion speaker without changing any
+        # other grouped rooms. Bedroom uses this to keep Office with Bedroom.
+        if self.path == "/sonos/ensure-companion":
+            try:
+                changed = self._ensure_kitchen_grouped()
+                self._json({"ok": True, "companion": bool(self.s_join),
+                            "already_grouped": bool(self.s_join) and not changed,
+                            "changed": changed})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 502)
+            return
+
+        # Copy this room's main-speaker volume to its default companion. Bedroom
+        # uses this so Office follows volume changes made by the TV remote.
+        if self.path == "/sonos/sync-companion-volume":
+            try:
+                if not self.s_join:
+                    self._json({"ok": True, "companion": False, "changed": False})
+                    return
+                grouped = self._companion_grouped()
+                group_changed = False if grouped else self._ensure_kitchen_grouped()
+                main_vol = self._speaker_volume(self.s_ip)
+                if main_vol is None:
+                    raise Exception("could not read main speaker volume")
+                companion_vol = self._speaker_volume(self.s_join)
+                volume_changed = companion_vol != main_vol
+                if volume_changed:
+                    self._set_speaker_volume(self.s_join, main_vol)
+                    companion_vol = main_vol
+                self._json({"ok": True, "companion": True, "grouped": grouped or group_changed,
+                            "group_changed": group_changed, "volume": main_vol,
+                            "companion_volume": companion_vol, "changed": volume_changed})
             except Exception as exc:
                 self._json({"error": str(exc)}, 502)
             return

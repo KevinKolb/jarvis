@@ -14,15 +14,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/styles.css?v=6">
-  <link rel="stylesheet" href="/kitchen/kitchen.css?v=6">
+  <link rel="stylesheet" href="../assets/styles.css?v=16">
+  <link rel="stylesheet" href="/kitchen/kitchen.css?v=16">
 </head>
 <body>
   <main class="page" data-room="Kitchen" data-sonos-room="kitchen" data-sonos-solo="true"
         data-hue-bridge="main" data-lights-group="82" data-lights-members="22,21,20,63,62">
     <!-- Bed header -->
     <header class="kitchen-head" id="kitchen-hero">
-      <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>Kitchen <span id="hero-deck">Lights</span><span id="hero-status"></span></h1>
+      <h1 class="kitchen-title"><svg class="kitchen-title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>Kitchen <span id="hero-deck">Lights</span><span id="hero-color"></span><span id="hero-status"></span></h1>
     </header>
 
     <a class="btn swipe-music" id="swipe-deck" href="?deck=music" aria-label="Switch view">
@@ -37,26 +37,15 @@
 
     <!-- Lights -->
     <section class="section theme-lights deck" id="deck-lights" aria-label="Lights">
-      <!-- 3 columns: COLOR · BRIGHT · ON -->
+      <!-- 2 columns: COLOR · BRIGHT (pick a brightness to engage) -->
       <div class="light-tools lights-3">
         <div class="l3-cell">
           <div class="l3-head"><span class="l3-num">1</span>Choose Color</div>
           <div class="swatches" id="swatches" role="group" aria-label="Light color"></div>
         </div>
         <div class="l3-cell">
-          <div class="l3-head"><span class="l3-num">2</span>Choose Bright</div>
+          <div class="l3-head"><span class="l3-num">2</span>Choose Brightness</div>
           <div class="bri-boxes" id="bri-boxes" role="group" aria-label="Brightness"></div>
-        </div>
-        <div class="l3-cell l3-engage">
-          <div class="l3-head"><span class="l3-num">3</span>Swipe On</div>
-          <button class="btn btn-toggle" id="lights-toggle" type="button" aria-label="Toggle Kitchen lights">
-            <span class="engage-paddle">
-              <span class="engage-cta engage-up">Swipe Up<br>Here For</span>
-              <span class="engage-color engage-up" id="engage-color">White</span>
-              <span class="engage-pct engage-up" id="engage-pct">100%</span>
-              <span class="engage-cta engage-down">Swipe Down<br>For Off</span>
-            </span>
-          </button>
         </div>
       </div>
 
@@ -101,6 +90,10 @@
         </div>
         <div class="chan-box">
         <div class="tool-row">
+          <span class="tool-label">Play In</span>
+          <div class="chan-row" id="row-share"></div>
+        </div>
+        <div class="tool-row">
           <span class="tool-label">Radio</span>
           <div class="chan-row" id="row-radio"></div>
         </div>
@@ -141,7 +134,7 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="../assets/app.js?v=7"></script>
+  <script src="../assets/app.js?v=46"></script>
   <script>
     /* Switch between the Lights and Music decks via swipe or the swipe buttons.
        A URL variable selects one too:  /bed/?deck=lights  or  /bed/?deck=music  */
